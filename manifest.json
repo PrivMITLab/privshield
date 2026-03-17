@@ -1,0 +1,71 @@
+{
+    "manifest_version": 3,
+    "name": "PrivShield – Privacy Guardian",
+    "version": "1.0.0",
+    "description": "PrivMITLab: Ad blocker, tracker blocker, and script controller. 100% local. Zero data collection.",
+    "author": "PrivMITLab",
+    "icons": {
+        "16": "icons/icon16.png",
+        "32": "icons/icon32.png",
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
+    },
+    "action": {
+        "default_popup": "popup/popup.html",
+        "default_icon": {
+            "16": "icons/icon16.png",
+            "32": "icons/icon32.png",
+            "48": "icons/icon48.png",
+            "128": "icons/icon128.png"
+        },
+        "default_title": "PrivShield – Click to manage privacy"
+    },
+    "background": {
+        "service_worker": "background.js",
+        "type": "module"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "run_at": "document_start",
+            "all_frames": true
+        }
+    ],
+    "permissions": [
+        "storage",
+        "tabs",
+        "activeTab",
+        "webRequest",
+        "declarativeNetRequest",
+        "declarativeNetRequestFeedback",
+        "scripting"
+    ],
+    "host_permissions": [
+        "<all_urls>"
+    ],
+    "declarative_net_request": {
+        "rule_resources": []
+    },
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "dashboard/dashboard.html"
+            ],
+            "matches": [
+                "<all_urls>"
+            ]
+        }
+    ],
+    "options_ui": {
+        "page": "dashboard/dashboard.html",
+        "open_in_tab": true
+    },
+    "content_security_policy": {
+        "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    }
+}

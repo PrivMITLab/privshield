@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PrivShield Dashboard – PrivMITLab</title>
+    <link rel="stylesheet" href="dashboard.css" />
+</head>
+
+<body>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- SIDEBAR                                         -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-logo">🛡</span>
+            <div>
+                <div class="sidebar-brand">PrivShield</div>
+                <div class="sidebar-sub">PrivMITLab</div>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <button class="nav-item active" data-tab="overview">
+                <span class="nav-icon">📊</span>
+                <span>Overview</span>
+            </button>
+            <button class="nav-item" data-tab="filters">
+                <span class="nav-icon">🗂</span>
+                <span>Filter Lists</span>
+            </button>
+            <button class="nav-item" data-tab="rules">
+                <span class="nav-icon">📝</span>
+                <span>Custom Rules</span>
+            </button>
+            <button class="nav-item" data-tab="sites">
+                <span class="nav-icon">🌐</span>
+                <span>Site Manager</span>
+            </button>
+            <button class="nav-item" data-tab="logs">
+                <span class="nav-icon">📋</span>
+                <span>Request Log</span>
+            </button>
+            <button class="nav-item" data-tab="about">
+                <span class="nav-icon">ℹ</span>
+                <span>About</span>
+            </button>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="sidebar-status" id="globalStatusBadge">
+                <span class="status-dot active" id="statusDot"></span>
+                <span id="statusText">Active</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- MAIN CONTENT                                    -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <main class="main">
+
+        <!-- ── OVERVIEW TAB ── -->
+        <section class="tab-panel active" id="tab-overview">
+            <div class="panel-header">
+                <h1>Overview</h1>
+                <p>Your privacy protection at a glance</p>
+            </div>
+
+            <!-- Big stat cards -->
+            <div class="stat-grid">
+                <div class="stat-big-card stat-blue">
+                    <div class="stat-big-num" id="ovTotalBlocked">0</div>
+                    <div class="stat-big-label">Total Requests Blocked</div>
+                </div>
+                <div class="stat-big-card stat-green">
+                    <div class="stat-big-num" id="ovSessionBlocked">0</div>
+                    <div class="stat-big-label">Blocked This Session</div>
+                </div>
+                <div class="stat-big-card stat-purple">
+                    <div class="stat-big-num" id="ovTotalRules">0</div>
+                    <div class="stat-big-label">Active Filter Rules</div>
+                </div>
+                <div class="stat-big-card stat-orange">
+                    <div class="stat-big-num" id="ovCompileTime">0ms</div>
+                    <div class="stat-big-label">Engine Compile Time</div>
+                </div>
+            </div>
+
+            <!-- Protection status -->
+            <div class="card">
+                <div class="card-title">Protection Status</div>
+                <div class="toggle-row">
+                    <div class="toggle-info">
+                        <span class="toggle-name">🛡 Global Protection</span>
+                        <span class="toggle-desc">Master on/off switch</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="ovToggleEnabled" />
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-row">
+                    <div class="toggle-info">
+                        <span class="toggle-name">🔒 Strict Mode</span>
+                        <span class="toggle-desc">Block all third-party requests</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="ovToggleStrict" />
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-row">
+                    <div class="toggle-info">
+                        <span class="toggle-name">📜 Block All Scripts</span>
+                        <span class="toggle-desc">Global JavaScript blocker</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="ovToggleScripts" />
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-row">
+                    <div class="toggle-info">
+                        <span class="toggle-name">🧬 Fingerprint Protection</span>
+                        <span class="toggle-desc">Canvas, WebGL, audio protection</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="ovToggleFingerprint" />
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-row">
+                    <div class="toggle-info">
+                        <span class="toggle-name">🔗 Strip Referrer Headers</span>
+                        <span class="toggle-desc">Remove cross-site referrer information</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="ovToggleReferrer" />
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-row">
+                    <div class="toggle-info">
+                        <span class="toggle-name">🕵 Spoof User-Agent</span>
+                        <span class="toggle-desc">Use a generic browser identifier</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="ovToggleUA" />
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Engine info -->
+            <div class="card">
+                <div class="card-title">Filter Engine</div>
+                <div class="info-grid" id="engineInfoGrid">
+                    <div class="info-row">
+                        <span class="info-label">Total Rules</span>
+                        <span class="info-value" id="engTotal">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Block Rules</span>
+                        <span class="info-value" id="engBlock">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Allow Rules</span>
+                        <span class="info-value" id="engAllow">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Cosmetic Rules</span>
+                        <span class="info-value" id="engCosmetic">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Parse Errors</span>
+                        <span class="info-value" id="engErrors">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Compile Time</span>
+                        <span class="info-value" id="engTime">-</span>
+                    </div>
+                </div>
+                <button class="btn btn-primary" id="btnReloadFilters">🔄 Recompile Filters</button>
+            </div>
+        </section>
+
+        <!-- ── FILTER LISTS TAB ── -->
+        <section class="tab-panel" id="tab-filters">
+            <div class="panel-header">
+                <h1>Filter Lists</h1>
+                <p>Manage your blocking rule sources</p>
+            </div>
+
+            <!-- Default lists -->
+            <div class="card">
+                <div class="card-title">Built-in Lists</div>
+                <p class="card-desc">These are bundled with PrivShield and always active.</p>
+
+                <div class="list-item">
+                    <div class="list-item-info">
+                        <span class="list-name">📋 PrivShield Default Rules</span>
+                        <span class="list-meta">Bundled | Always active</span>
+                    </div>
+                    <span class="badge badge-green">Active</span>
+                </div>
+            </div>
+
+            <!-- External lists -->
+            <div class="card">
+                <div class="card-title">External Filter Lists</div>
+                <p class="card-desc">
+                    Manually update from trusted open-source sources.
+                    Click Update to download the latest rules.
+                </p>
+
+                <div id="externalListsContainer">
+                    <!-- Populated by JS -->
+                </div>
+
+                <div class="predefined-lists">
+                    <div class="card-title" style="margin-top:16px">Add Predefined List</div>
+                    <div class="predefined-grid" id="predefinedGrid">
+
+                        <div class="predefined-item" data-name="EasyList"
+                            data-url="https://easylist.to/easylist/easylist.txt">
+                            <div class="predefined-name">EasyList</div>
+                            <div class="predefined-desc">Main ad blocking list</div>
+                            <button class="btn btn-sm btn-primary predefined-add">+ Add</button>
+                        </div>
+
+                        <div class="predefined-item" data-name="EasyPrivacy"
+                            data-url="https://easylist.to/easylist/easyprivacy.txt">
+                            <div class="predefined-name">EasyPrivacy</div>
+                            <div class="predefined-desc">Tracking protection</div>
+                            <button class="btn btn-sm btn-primary predefined-add">+ Add</button>
+                        </div>
+
+                        <div class="predefined-item" data-name="uBlock-Filters"
+                            data-url="https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters.txt">
+                            <div class="predefined-name">uBlock Filters</div>
+                            <div class="predefined-desc">uBlockOrigin base rules</div>
+                            <button class="btn btn-sm btn-primary predefined-add">+ Add</button>
+                        </div>
+
+                        <div class="predefined-item" data-name="uBlock-Privacy"
+                            data-url="https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/privacy.txt">
+                            <div class="predefined-name">uBlock Privacy</div>
+                            <div class="predefined-desc">Privacy-focused rules</div>
+                            <button class="btn btn-sm btn-primary predefined-add">+ Add</button>
+                        </div>
+
+                        <div class="predefined-item" data-name="uBlock-Badware"
+                            data-url="https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/badware.txt">
+                            <div class="predefined-name">uBlock Badware</div>
+                            <div class="predefined-desc">Malware domain blocking</div>
+                            <button class="btn btn-sm btn-primary predefined-add">+ Add</button>
+                        </div>
+
+                        <div class="predefined-item" data-name="Peter-Lowe-Hosts"
+                            data-url="https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=0&mimetype=plaintext">
+                            <div class="predefined-name">Peter Lowe's List</div>
+                            <div class="predefined-desc">Ad server blocklist</div>
+                            <button class="btn btn-sm btn-primary predefined-add">+ Add</button>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Custom URL input -->
+                <div class="card-title" style="margin-top:16px">Add Custom List URL</div>
+                <div class="input-row">
+                    <input type="text" id="customListName" placeholder="List name (e.g. MyList)" class="input" />
+                    <input type="url" id="customListUrl" placeholder="https://... (HTTPS only)" class="input" />
+                    <button class="btn btn-primary" id="btnAddCustomList">+ Add</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── CUSTOM RULES TAB ── -->
+        <section class="tab-panel" id="tab-rules">
+            <div class="panel-header">
+                <h1>Custom Rules</h1>
+                <p>Write your own filter rules</p>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Rule Format Reference</div>
+                <div class="code-block">
+                    <pre>
+# Block domain:
+||example.com^
+
+# Allow exception:
+@@||example.com^
+
+# Block specific URL:
+||ads.example.com/banner^
+
+# Block by type:
+||tracker.com^$script
+
+# Block third-party scripts:
+||analytics.com^$script,third-party
+
+# Element hiding (global):
+##.ad-container
+
+# Element hiding (site-specific):
+example.com##.sidebar-ad
+
+# Allow on specific domain:
+||cdn.example.com^$domain=example.com
+
+# Comments:
+! This is a comment
+</pre>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Your Custom Rules</div>
+                <textarea id="customRulesEditor" class="code-editor" placeholder="Enter your custom rules here...
+One rule per line.
+
+Examples:
+||example-ads.com^
+@@||safe-cdn.com^
+##.advertisement" spellcheck="false"></textarea>
+                <div class="editor-actions">
+                    <span class="editor-hint" id="ruleLineCount">0 rules</span>
+                    <div>
+                        <button class="btn btn-secondary" id="btnClearRules">Clear</button>
+                        <button class="btn btn-primary" id="btnSaveRules">💾 Save & Apply</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── SITE MANAGER TAB ── -->
+        <section class="tab-panel" id="tab-sites">
+            <div class="panel-header">
+                <h1>Site Manager</h1>
+                <p>Per-site privacy settings</p>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Site Settings</div>
+
+                <div class="input-row">
+                    <input type="text" id="siteSearchInput" placeholder="Search sites..." class="input" />
+                    <button class="btn btn-secondary" id="btnRefreshSites">↻ Refresh</button>
+                </div>
+
+                <div id="sitesList" class="sites-list">
+                    <!-- Populated by JS -->
+                    <div class="empty-state">No site settings configured yet.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── LOGS TAB ── -->
+        <section class="tab-panel" id="tab-logs">
+            <div class="panel-header">
+                <h1>Request Log</h1>
+                <p>Blocked requests — stored locally only</p>
+            </div>
+
+            <div class="card">
+                <div class="log-toolbar">
+                    <div class="log-filters">
+                        <select id="logTypeFilter" class="select">
+                            <option value="">All Types</option>
+                            <option value="script">Scripts</option>
+                            <option value="image">Images</option>
+                            <option value="xmlhttprequest">XHR</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <input type="text" id="logSearchInput" placeholder="Search URL..." class="input" />
+                    </div>
+                    <div class="log-actions">
+                        <button class="btn btn-secondary" id="btnRefreshLogs">↻</button>
+                        <button class="btn btn-danger" id="btnClearLogs">🗑 Clear</button>
+                    </div>
+                </div>
+
+                <div class="log-stats-bar">
+                    <span>Total blocked: <strong id="logTotalCount">0</strong></span>
+                    <span>Showing: <strong id="logShownCount">0</strong></span>
+                </div>
+
+                <div id="logsContainer" class="logs-container">
+                    <div class="empty-state">No blocked requests logged yet.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── ABOUT TAB ── -->
+        <section class="tab-panel" id="tab-about">
+            <div class="panel-header">
+                <h1>About PrivShield</h1>
+                <p>Open-source privacy guardian by PrivMITLab</p>
+            </div>
+
+            <div class="card about-card">
+                <div class="about-logo">🛡</div>
+                <div class="about-brand">PrivShield</div>
+                <div class="about-version">Version 1.0.0</div>
+                <div class="about-tagline">"Block Everything. Trust Nothing. Control Everything."</div>
+                <div class="about-by">by <strong>PrivMITLab</strong></div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Privacy Guarantee</div>
+                <div class="about-guarantees">
+                    <div class="guarantee-item">
+                        <span class="guarantee-icon">✅</span>
+                        <div>
+                            <strong>Zero Data Collection</strong>
+                            <p>No browsing data, URLs, or personal information is ever collected.</p>
+                        </div>
+                    </div>
+                    <div class="guarantee-item">
+                        <span class="guarantee-icon">✅</span>
+                        <div>
+                            <strong>No Telemetry</strong>
+                            <p>No analytics, crash reports, or usage statistics are sent anywhere.</p>
+                        </div>
+                    </div>
+                    <div class="guarantee-item">
+                        <span class="guarantee-icon">✅</span>
+                        <div>
+                            <strong>100% Local Processing</strong>
+                            <p>All filtering happens in your browser. No external servers involved.</p>
+                        </div>
+                    </div>
+                    <div class="guarantee-item">
+                        <span class="guarantee-icon">✅</span>
+                        <div>
+                            <strong>Open Source</strong>
+                            <p>Full source code available. Audit every line. Trust through transparency.</p>
+                        </div>
+                    </div>
+                    <div class="guarantee-item">
+                        <span class="guarantee-icon">✅</span>
+                        <div>
+                            <strong>Minimal Permissions</strong>
+                            <p>Only requests permissions absolutely required for filtering to work.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Permissions Used</div>
+                <div class="perm-list">
+                    <div class="perm-item">
+                        <code>webRequest</code>
+                        <span>Intercept and block network requests</span>
+                    </div>
+                    <div class="perm-item">
+                        <code>declarativeNetRequest</code>
+                        <span>Efficient request filtering</span>
+                    </div>
+                    <div class="perm-item">
+                        <code>storage</code>
+                        <span>Store settings and logs locally</span>
+                    </div>
+                    <div class="perm-item">
+                        <code>tabs</code>
+                        <span>Know which tab a request comes from</span>
+                    </div>
+                    <div class="perm-item">
+                        <code>activeTab</code>
+                        <span>Access current tab for popup display</span>
+                    </div>
+                    <div class="perm-item">
+                        <code>scripting</code>
+                        <span>Inject cosmetic filtering CSS</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Notification toast -->
+    <div class="dash-toast" id="dashToast"></div>
+
+    <script src="dashboard.js" type="module"></script>
+</body>
+
+</html>
