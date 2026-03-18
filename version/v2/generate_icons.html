@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Icon Maker</title>
+</head>
+
+<body style="background:#0d1117;color:#fff;
+             font-family:Arial;text-align:center;
+             padding:40px;">
+
+    <h2 style="color:#3fb950">PrivShield Icon Maker</h2>
+    <p style="color:#8b949e">Button dabao – 4 icons download honge</p>
+
+    <button onclick="makeAll()" style="
+    background:#238636;color:white;
+    border:none;padding:14px 32px;
+    border-radius:6px;font-size:16px;
+    cursor:pointer;margin-top:20px;">
+        ⬇ Download All Icons (16, 32, 48, 128)
+    </button>
+
+    <p id="msg" style="color:#3fb950;margin-top:20px;font-size:14px;"></p>
+
+    <canvas id="c" style="display:none"></canvas>
+
+    <script>
+        function drawIcon(size) {
+            const c = document.getElementById('c');
+            c.width = size;
+            c.height = size;
+            const ctx = c.getContext('2d');
+
+            // Dark background circle
+            ctx.beginPath();
+            ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+            ctx.fillStyle = '#161b22';
+            ctx.fill();
+
+            // Green shield body
+            ctx.beginPath();
+            ctx.moveTo(size * 0.5, size * 0.10);
+            ctx.lineTo(size * 0.85, size * 0.25);
+            ctx.lineTo(size * 0.85, size * 0.55);
+            ctx.quadraticCurveTo(size * 0.85, size * 0.88, size * 0.5, size * 0.93);
+            ctx.quadraticCurveTo(size * 0.15, size * 0.88, size * 0.15, size * 0.55);
+            ctx.lineTo(size * 0.15, size * 0.25);
+            ctx.closePath();
+
+            const g = ctx.createLinearGradient(0, size * 0.1, 0, size * 0.93);
+            g.addColorStop(0, '#3fb950');
+            g.addColorStop(1, '#196c2e');
+            ctx.fillStyle = g;
+            ctx.fill();
+
+            // White checkmark
+            ctx.beginPath();
+            ctx.moveTo(size * 0.32, size * 0.52);
+            ctx.lineTo(size * 0.46, size * 0.66);
+            ctx.lineTo(size * 0.70, size * 0.38);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = Math.max(1.5, size * 0.08);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+        }
+
+        async function makeAll() {
+            const sizes = [16, 32, 48, 128];
+            const msg = document.getElementById('msg');
+
+            for (const s of sizes) {
+                drawIcon(s);
+
+                await new Promise(resolve => {
+                    document.getElementById('c').toBlob(blob => {
+                        const a = document.createElement('a');
+                        a.href = URL.createObjectURL(blob);
+                        a.download = 'icon' + s + '.png';
+                        a.click();
+                        URL.revokeObjectURL(a.href);
+                        msg.textContent = '✅ icon' + s + '.png downloaded...';
+                        setTimeout(resolve, 400);
+                    }, 'image/png');
+                });
+            }
+
+            msg.innerHTML = `
+    ✅ Saare 4 icons download ho gaye!<br><br>
+    <span style="color:#8b949e">
+      Ab inhe <b style="color:#58a6ff">E:\\tmp\\privshield\\icons\\</b>
+      folder mein daalo<br>
+      Phir Chrome mein extension reload karo ↻
+    </span>
+  `;
+        }
+    </script>
+</body>
+
+</html>

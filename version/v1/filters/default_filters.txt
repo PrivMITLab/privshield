@@ -1,0 +1,250 @@
+! PrivShield Default Filter List
+! PrivMITLab – Block Everything. Trust Nothing. Control Everything.
+! Version: 1.0.0
+! Last Updated: 2024
+! Format: Adblock Plus compatible
+!
+! This list provides baseline protection against:
+! - Common ad networks
+! - Analytics trackers
+! - Fingerprinting scripts
+! - Social media trackers
+! - Telemetry endpoints
+!
+! ════════════════════════════════════════════
+! AD NETWORKS
+! ════════════════════════════════════════════
+
+||doubleclick.net^
+||googlesyndication.com^
+||googleadservices.com^
+||adnxs.com^
+||adsafeprotected.com^
+||advertising.com^
+||ads.yahoo.com^
+||ads.twitter.com^
+||adserver.com^
+||ad.doubleclick.net^
+||adsystem.amazon.com^
+||ads.amazon.com^
+||ads.pubmatic.com^
+||ads.rubiconproject.com^
+||servedby.flashtalking.com^
+||ads.openx.net^
+||ads.criteo.com^
+||ads.outbrain.com^
+||ads.taboola.com^
+||tpc.googlesyndication.com^
+||pagead2.googlesyndication.com^
+||securepubads.g.doubleclick.net^
+||static.doubleclick.net^
+||cm.g.doubleclick.net^
+||ad.linksynergy.com^
+||adclick.g.doubleclock.net^
+||media.net^
+||adf.ly^
+||adfarm.mediaplex.com^
+||ads.trafficjunky.net^
+||ads2.trafficjunky.net^
+||serving-sys.com^
+||spe.atdmt.com^
+||view.atdmt.com^
+||adtech.de^
+||smartadserver.com^
+||bidswitch.net^
+||ib.adnxs.com^
+||sin1.ib.adnxs.com^
+
+! ════════════════════════════════════════════
+! ANALYTICS & TRACKING
+! ════════════════════════════════════════════
+
+||google-analytics.com^
+||analytics.google.com^
+||ssl.google-analytics.com^
+||www.google-analytics.com^
+||stats.g.doubleclick.net^
+||googletagmanager.com^
+||googletagservices.com^
+||facebook.com/tr^
+||connect.facebook.net^
+||staticxx.facebook.com^
+||graph.facebook.com^
+||pixel.facebook.com^
+||hotjar.com^
+||static.hotjar.com^
+||script.hotjar.com^
+||mixpanel.com^
+||cdn.mixpanel.com^
+||heap.io^
+||heapanalytics.com^
+||fullstory.com^
+||rs6.net^
+||amplitude.com^
+||cdn.amplitude.com^
+||api.amplitude.com^
+||segment.io^
+||cdn.segment.com^
+||api.segment.io^
+||analytics.segment.com^
+||mouseflow.com^
+||cdn.mouseflow.com^
+||clarity.ms^
+||bat.bing.com^
+||sc.omtrdc.net^
+||2o7.net^
+||omniture.com^
+||demdex.net^
+||adobetag.com^
+||quantserve.com^
+||pixel.quantserve.com^
+||scorecardresearch.com^
+||beacon.scorecardresearch.com^
+||chartbeat.net^
+||chartbeat.com^
+||newrelic.com^
+||nr-data.net^
+||bam.nr-data.net^
+||statcounter.com^
+||mc.yandex.ru^
+||smartlook.com^
+||rec.smartlook.com^
+||matomo.cloud^
+||piwik.pro^
+||snowplow.io^
+||collector.github.com^
+
+! ════════════════════════════════════════════
+! FINGERPRINTING SCRIPTS
+! ════════════════════════════════════════════
+
+||fingerprintjs.com^
+||cdn.fingerprintjs.com^
+||fp.fingerprintjs.com^
+||fpjscdn.net^
+||cdn.fpjscdn.net^
+||fp2.fingerprintjs.com^
+||iovation.com^
+||threatmetrix.com^
+||h.online-metrix.net^
+||online-metrix.net^
+||signifyd.com^
+||kaptcha.com^
+
+! ════════════════════════════════════════════
+! SOCIAL MEDIA TRACKERS
+! ════════════════════════════════════════════
+
+||platform.twitter.com^$third-party
+||syndication.twitter.com^
+||static.ads-twitter.com^
+||t.co^$image,third-party
+||pinterest.com/ct.html^
+||assets.pinterest.com^
+||log.pinterest.com^
+||s.pinimg.com^$third-party
+||linkedin.com/li/track^
+||px.ads.linkedin.com^
+||snap.licdn.com^
+||platform.linkedin.com^$third-party
+||reddit.com/api/collect^
+||redd.it^$image,third-party
+||alb.reddit.com^
+||events.reddit.com^
+
+! ════════════════════════════════════════════
+! TELEMETRY & CRASH REPORTING
+! ════════════════════════════════════════════
+
+||sentry.io^
+||ingest.sentry.io^
+||browser.sentry-cdn.com^
+||bugsnag.com^
+||notify.bugsnag.com^
+||sessions.bugsnag.com^
+||rollbar.com^
+||api.rollbar.com^
+||loggly.com^
+||sumologic.com^
+||crashlytics.com^
+||firebase-settings.crashlytics.com^
+||app-measurement.com^
+||clients1.google.com^
+||safebrowsing.google.com^
+
+! ════════════════════════════════════════════
+! MALWARE & BADWARE DOMAINS
+! ════════════════════════════════════════════
+
+||malvertising.com^
+||clickfraud.net^
+||popads.net^
+||popcash.net^
+||revenueads.net^
+||propellerads.com^
+||adcash.com^
+||adhitz.com^
+||adversal.com^
+
+! ════════════════════════════════════════════
+! ELEMENT HIDING (Cosmetic Rules)
+! ════════════════════════════════════════════
+
+! Generic ad containers
+##.ad-container
+##.ad-wrapper
+##.advertisement
+##.ads-container
+##.adsbygoogle
+##[id^="ad-"]
+##[id^="ads-"]
+##[class^="ad-"]
+##[class*="-advertisement-"]
+##[class*="banner-ad"]
+##.ad-banner
+##.ad-slot
+##.ad-unit
+##[id*="google_ads"]
+##[id^="div-gpt-ad"]
+##[class*="dfp-ad"]
+##.dfp-tag-wrapper
+##[id*="AdSense"]
+##[id^="ad_"]
+##[id^="Ad_"]
+##.sponsored-content
+##[class*="sponsored_"]
+##[data-ad-unit]
+##[data-ad-slot]
+##[data-ad-client]
+
+! Floating/sticky ads
+##.sticky-ad
+##.floating-ad
+##[class*="popup-ad"]
+##.overlay-ad
+
+! Newsletter/subscribe popups
+##.newsletter-popup
+##[class*="cookie-consent"]
+
+! Social share buttons that track
+##[class*="fb-like"]
+##[class*="twitter-share"]
+
+! ════════════════════════════════════════════
+! EXCEPTIONS (safe CDNs / legitimate resources)
+! ════════════════════════════════════════════
+
+! Allow Google Fonts (not tracking by default)
+@@||fonts.googleapis.com^$stylesheet
+@@||fonts.gstatic.com^$font
+
+! Allow legitimate CDNs
+@@||cdnjs.cloudflare.com^
+@@||cdn.jsdelivr.net^
+@@||unpkg.com^
+@@||fastly.net^$script,domain=github.com
+
+! ════════════════════════════════════════════
+! END OF DEFAULT FILTER LIST
+! ════════════════════════════════════════════

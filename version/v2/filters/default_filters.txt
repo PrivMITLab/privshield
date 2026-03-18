@@ -1,0 +1,758 @@
+! PrivShield Default Filter List v3.0.0
+! PrivMITLab – Maximum AdBlock Score
+! Optimized for adblock-tester.com 90+ score
+!
+! ════════════════════════════════════════
+! SECTION 1: ADVERTISING – ALL TYPES
+! ════════════════════════════════════════
+
+! Google Ads – Complete
+||doubleclick.net^
+||ad.doubleclick.net^
+||ads.doubleclick.net^
+||static.doubleclick.net^
+||cm.g.doubleclick.net^
+||stats.g.doubleclick.net^
+||tpc.googlesyndication.com^
+||pagead2.googlesyndication.com^
+||securepubads.g.doubleclick.net^
+||googlesyndication.com^
+||googleadservices.com^
+||www.googleadservices.com^
+||partner.googleadservices.com^
+||adservice.google.com^
+||adservice.google.co.in^
+||adservice.google.co.uk^
+||adservice.google.com.au^
+||adservice.google.ca^
+||adservice.google.de^
+||adservice.google.fr^
+||pagead.googlesyndication.com^
+||imasdk.googleapis.com^
+||fundingchoicesmessages.google.com^
+||adtrafficquality.google.com^
+||ads.google.com^
+||adsense.google.com^
+
+! AppNexus / Xandr
+||adnxs.com^
+||ib.adnxs.com^
+||sin1.ib.adnxs.com^
+||secure.adnxs.com^
+||nym1.ib.adnxs.com^
+||lax1.ib.adnxs.com^
+
+! Criteo
+||criteo.com^
+||ads.criteo.com^
+||static.criteo.net^
+||rtax.criteo.com^
+||gum.criteo.com^
+||widget.criteo.com^
+||sslwidget.criteo.com^
+||dis.criteo.com^
+
+! Outbrain
+||outbrain.com^
+||ads.outbrain.com^
+||amplify.outbrain.com^
+||log.outbrain.com^
+||widgets.outbrain.com^
+
+! Taboola
+||taboola.com^
+||ads.taboola.com^
+||cdn.taboola.com^
+||trc.taboola.com^
+||images.taboola.com^
+||api.taboola.com^
+
+! Media.net
+||media.net^
+||static.media.net^
+||adservetx.media.net^
+||data.media.net^
+
+! Advertising.com / Oath
+||advertising.com^
+||adtech.de^
+||adtechus.com^
+||yahooadtech.com^
+
+! OpenX
+||openx.net^
+||ads.openx.net^
+||us-u.openx.net^
+||delivery.openx.net^
+
+! Rubicon / Magnite
+||rubiconproject.com^
+||ads.rubiconproject.com^
+||fastlane.rubiconproject.com^
+||optimized-by.rubiconproject.com^
+||eus.rubiconproject.com^
+
+! PubMatic
+||pubmatic.com^
+||ads.pubmatic.com^
+||image6.pubmatic.com^
+||image8.pubmatic.com^
+||simage2.pubmatic.com^
+
+! Index Exchange
+||indexexchange.com^
+||casalemedia.com^
+||as-sec.casalemedia.com^
+
+! The Trade Desk
+||thetradedesk.com^
+||tradedesk.com^
+||insight.adsrvr.org^
+||match.adsrvr.org^
+||js.adsrvr.org^
+
+! TripleLift
+||triplelift.com^
+||tlx.3lift.com^
+
+! Sharethrough
+||sharethrough.com^
+||btlr.sharethrough.com^
+
+! Teads
+||teads.tv^
+||a.teads.tv^
+||cdn2.teads.tv^
+
+! MGID
+||mgid.com^
+||jsc.mgid.com^
+||servicer.mgid.com^
+
+! Smartadserver
+||smartadserver.com^
+||ced.sascdn.com^
+||ww251.smartadserver.com^
+
+! Bidswitch
+||bidswitch.net^
+||x.bidswitch.net^
+
+! Sovrn / Lijit
+||sovrn.com^
+||lijit.com^
+||ap.lijit.com^
+
+! Conversant / Epsilon
+||conversantmedia.com^
+||epsilon.com^
+||fastclick.net^
+||serving-sys.com^
+
+! Verizon / Yahoo SSP
+||ads.yahoo.com^
+||onemobile.yahoo.com^
+
+! Amazon Ads
+||adsystem.amazon.com^
+||aax.amazon-adsystem.com^
+||z-na.amazon-adsystem.com^
+||s.amazon-adsystem.com^
+||mads.amazon-adsystem.com^
+||c.amazon-adsystem.com^
+
+! Other Ad Networks
+||adf.ly^
+||adfarm.mediaplex.com^
+||adform.net^
+||track.adform.net^
+||admanmedia.com^
+||admixer.net^
+||adnow.com^
+||adpone.com^
+||adsafeprotected.com^
+||adtelligent.com^
+||adyoulike.com^
+||amxrtb.com^
+||appier.com^
+||bidsopt.com^
+||colossusssp.com^
+||districtm.ca^
+||districtm.io^
+||e-planning.net^
+||emxdgt.com^
+||etarget.net^
+||exoclick.com^
+||freewheel.tv^
+||gumgum.com^
+||hilltopads.net^
+||improvedigital.com^
+||inmobi.com^
+||innovid.com^
+||iponweb.net^
+||juicyads.com^
+||kargo.com^
+||lkqd.com^
+||lkqd.net^
+||loopme.com^
+||lotame.com^
+||minutemedia.com^
+||mobvista.com^
+||nend.net^
+||nexage.com^
+||plugrush.com^
+||popcash.net^
+||popads.net^
+||propellerads.com^
+||adsterra.com^
+||pushground.com^
+||revenueads.net^
+||rhythmone.com^
+||rtbhouse.com^
+||smaato.net^
+||smartclip.net^
+||soasta.com^
+||sonobi.com^
+||spotx.tv^
+||spotxchange.com^
+||springserve.com^
+||springserve.net^
+||svonm.com^
+||tapad.com^
+||theadex.com^
+||turn.com^
+||tynt.com^
+||undertone.com^
+||unifiedid.com^
+||vidoomy.com^
+||vpon.com^
+||widespace.com^
+||xapads.com^
+||xaxis.com^
+||yieldbot.com^
+||yieldlab.net^
+||yieldmo.com^
+||zeropark.com^
+||33across.com^
+||4dsply.com^
+||vmadx.com^
+||contextweb.com^
+||liveintent.com^
+||amobee.com^
+||synacor.com^
+||revcontent.com^
+||adblade.com^
+||evadav.com^
+||richpush.co^
+||clickadu.com^
+||admaven.com^
+||adspirit.de^
+||adition.com^
+||adscale.de^
+||intelliads.com^
+||adhese.com^
+||adhese.net^
+||ssp.ynxs.io^
+
+! IMAGE ADS – Specific rules for adblock-tester
+||ad.*.com^$image
+||ads.*.com^$image
+/banner/$image
+/banners/$image
+/ad-image/$image
+/ad_image/$image
+/adimage/$image
+/advertisement/$image
+/ads/$image,domain=~reddit.com
+/adsense/$image
+/advert/$image
+/adverts/$image
+||*/ad.gif^
+||*/ad.jpg^
+||*/ad.png^
+||*/ads.gif^
+||*/ads.jpg^
+||*/ads.png^
+||*/banner.gif^
+||*/banner.jpg^
+||*/banner.png^
+||*/banners/*.gif^
+||*/banners/*.jpg^
+||*/banners/*.png^
+||*/advertisement.gif^
+||*/advertisement.jpg^
+||*/advertisement.png^
+
+! ════════════════════════════════════════
+! SECTION 2: ANALYTICS & TRACKING
+! ════════════════════════════════════════
+
+! Google Analytics – All versions
+||google-analytics.com^
+||analytics.google.com^
+||ssl.google-analytics.com^
+||www.google-analytics.com^
+||googletagmanager.com^
+||googletagservices.com^
+||gtag/js^
+||gtm.js^
+
+! Facebook / Meta Pixel
+||connect.facebook.net^
+||facebook.com/tr^
+||pixel.facebook.com^
+||staticxx.facebook.com^
+||graph.facebook.com^
+
+! HotJar
+||hotjar.com^
+||static.hotjar.com^
+||script.hotjar.com^
+||vars.hotjar.com^
+||insights.hotjar.com^
+
+! Mixpanel
+||mixpanel.com^
+||cdn.mixpanel.com^
+||api.mixpanel.com^
+
+! Heap Analytics
+||heap.io^
+||heapanalytics.com^
+||cdn.heapanalytics.com^
+
+! FullStory
+||fullstory.com^
+||rs.fullstory.com^
+||edge.fullstory.com^
+
+! Amplitude
+||amplitude.com^
+||cdn.amplitude.com^
+||api.amplitude.com^
+||api2.amplitude.com^
+
+! Segment
+||segment.io^
+||cdn.segment.com^
+||api.segment.io^
+||analytics.segment.com^
+||segment.com^
+
+! Mouseflow
+||mouseflow.com^
+||cdn.mouseflow.com^
+||a.mouseflow.com^
+
+! Microsoft Clarity
+||clarity.ms^
+||c.clarity.ms^
+
+! Bing / Microsoft UET
+||bat.bing.com^
+||udc.bing.com^
+
+! Adobe Analytics
+||sc.omtrdc.net^
+||2o7.net^
+||omniture.com^
+||demdex.net^
+||adobetag.com^
+||adobe.com/b/ss^
+
+! Quantcast
+||quantserve.com^
+||pixel.quantserve.com^
+||secure.quantserve.com^
+
+! comScore
+||scorecardresearch.com^
+||beacon.scorecardresearch.com^
+||comscore.com^
+||voicefive.com^
+||imrworldwide.com^
+
+! Chartbeat
+||chartbeat.net^
+||chartbeat.com^
+||static.chartbeat.com^
+||ping.chartbeat.net^
+
+! New Relic
+||newrelic.com^
+||nr-data.net^
+||bam.nr-data.net^
+||js-agent.newrelic.com^
+
+! StatCounter
+||statcounter.com^
+||c.statcounter.com^
+
+! Yandex Metrica
+||mc.yandex.ru^
+||mc.yandex.com^
+||counter.yadro.ru^
+
+! SmartLook
+||smartlook.com^
+||rec.smartlook.com^
+
+! HubSpot
+||js.hsforms.net^
+||js.hs-analytics.net^
+||js.hs-scripts.com^
+||js.hscollectedforms.net^
+||js.hscta.net^
+||track.hubspot.com^
+||api.hubspot.com^
+||forms.hsforms.com^
+||cta-service-cms2.hubspot.com^
+
+! Intercom
+||track.intercom.io^
+||intercom.io^
+||widget.intercom.io^
+||js.intercomcdn.com^
+
+! Kissmetrics
+||kissmetrics.com^
+||kissmetrics.io^
+
+! Matomo / Piwik
+||matomo.cloud^
+||piwik.pro^
+
+! Snowplow
+||snowplow.io^
+||collector.github.com^
+
+! Other Analytics
+||krxd.net^
+||bluekai.com^
+||exelator.com^
+||rfihub.com^
+||rfihub.net^
+||trkn.us^
+||pippio.com^
+||rlcdn.com^
+||agkn.com^
+||d.agkn.com^
+||cedexis.com^
+||cedexis.net^
+||cedexis-radar.net^
+||appsflyer.com^
+||adjust.com^
+||branch.io^
+||kochava.com^
+||singular.net^
+||tenjin.io^
+||tune.com^
+||hasoffers.com^
+||convertro.com^
+||conviva.com^
+||nr7.us^
+||fwmrm.net^
+||mediaplex.com^
+||moatads.com^
+||moatpixel.com^
+||flurry.com^
+||yahoo-flurry.com^
+||insight.adsrvr.org^
+
+! ════════════════════════════════════════
+! SECTION 3: ERROR TRACKERS
+! (adblock-tester checks these)
+! ════════════════════════════════════════
+
+! Sentry – All endpoints
+||sentry.io^
+||ingest.sentry.io^
+||o*.ingest.sentry.io^
+||browser.sentry-cdn.com^
+||cdn.ravenjs.com^
+||ravenjs.com^
+
+! Bugsnag
+||bugsnag.com^
+||notify.bugsnag.com^
+||sessions.bugsnag.com^
+||app.bugsnag.com^
+
+! Rollbar
+||rollbar.com^
+||api.rollbar.com^
+||cdnjs.rollbar.com^
+
+! Loggly
+||loggly.com^
+||logs-01.loggly.com^
+
+! Sumo Logic
+||sumologic.com^
+||collectors.sumologic.com^
+
+! Crashlytics / Firebase
+||crashlytics.com^
+||firebase-settings.crashlytics.com^
+||app-measurement.com^
+
+! TrackJS
+||trackjs.com^
+||d2zah9y47r7bi2.cloudfront.net^
+
+! Raygun
+||raygun.com^
+||api.raygun.com^
+||api.raygun.io^
+
+! Errorception
+||errorception.com^
+||beacon.errorception.com^
+
+! Countly
+||countly.com^
+
+! Datadog
+||datadoghq.com^
+||browser-intake-datadoghq.com^
+||logs.browser-intake-datadoghq.com^
+
+! LogRocket
+||logrocket.com^
+||cdn.logrocket.io^
+||r.logrocket.io^
+
+! ════════════════════════════════════════
+! SECTION 4: FINGERPRINTING
+! ════════════════════════════════════════
+
+||fingerprintjs.com^
+||cdn.fingerprintjs.com^
+||fp.fingerprintjs.com^
+||fpjscdn.net^
+||cdn.fpjscdn.net^
+||iovation.com^
+||threatmetrix.com^
+||h.online-metrix.net^
+||online-metrix.net^
+||signifyd.com^
+
+! ════════════════════════════════════════
+! SECTION 5: SOCIAL TRACKERS
+! ════════════════════════════════════════
+
+||syndication.twitter.com^
+||static.ads-twitter.com^
+||platform.twitter.com^$third-party
+||log.pinterest.com^
+||px.ads.linkedin.com^
+||snap.licdn.com^
+||platform.linkedin.com^$third-party
+||alb.reddit.com^
+||events.reddit.com^
+||analytics.tiktok.com^
+||ads.tiktok.com^
+||business-api.tiktok.com^
+
+! ════════════════════════════════════════
+! SECTION 6: ELEMENT HIDING (Cosmetic)
+! ════════════════════════════════════════
+
+! Generic ad containers
+##.ad-container
+##.ad-wrapper
+##.advertisement
+##.ads-container
+##.adsbygoogle
+##[id^="ad-"]
+##[id^="ads-"]
+##[id^="Ad_"]
+##[id^="ad_"]
+##[class^="ad-"]
+##[class*="-advertisement-"]
+##[class*="banner-ad"]
+##[class*="ad-banner"]
+##.ad-slot
+##.ad-unit
+##[id*="google_ads"]
+##[id^="div-gpt-ad"]
+##[class*="dfp-ad"]
+##.dfp-tag-wrapper
+##[id*="AdSense"]
+##.sponsored-content
+##[class*="sponsored_"]
+##[data-ad-unit]
+##[data-ad-slot]
+##[data-ad-client]
+##.sticky-ad
+##.floating-ad
+##[class*="popup-ad"]
+##.overlay-ad
+##[id^="rc-widget"]
+##.outbrain-widget
+##[data-widget-id^="ob-"]
+##.OUTBRAIN
+##[class*="taboola"]
+##.trc_rbox
+##[id*="taboola"]
+##[class*="mgid"]
+##[id*="mgid"]
+
+! Image ad hiding
+##img[src*="doubleclick"]
+##img[src*="googlesyndication"]
+##img[src*="/ads/"]
+##img[src*="/banners/"]
+##img[src*="advertisement"]
+##img[src*="/ad."]
+##img[src*="/ads."]
+##div[class*="ad-image"]
+##div[id*="ad-image"]
+
+! adblock-tester.com specific
+##iframe[src*="doubleclick"]
+##iframe[src*="googlesyndication"]
+##iframe[src*="adnxs"]
+##iframe[src*="advertising"]
+##div[id*="adsense"]
+##div[class*="adsense"]
+
+! ════════════════════════════════════════
+! SECTION 7: EXCEPTIONS (Safe CDNs)
+! ════════════════════════════════════════
+
+@@||fonts.googleapis.com^$stylesheet
+@@||fonts.gstatic.com^$font
+@@||cdnjs.cloudflare.com^
+@@||cdn.jsdelivr.net^
+@@||unpkg.com^
+@@||ajax.googleapis.com^$script
+@@||code.jquery.com^$script
+! ════════════════════════════════════════
+! ADBLOCK-TESTER.COM SPECIFIC FIXES
+! ════════════════════════════════════════
+
+! Image ad domains used by adblock-tester
+||googleadservices.com^$image
+||doubleclick.net^$image
+||googlesyndication.com^$image
+||adnxs.com^$image
+||advertising.com^$image
+||ads.yahoo.com^$image
+||media.net^$image
+||criteo.com^$image
+||pubmatic.com^$image
+||rubiconproject.com^$image
+||openx.net^$image
+||adtech.de^$image
+||smartadserver.com^$image
+||adform.net^$image
+||adformnet.com^$image
+
+! Banner image patterns
+/ad.gif$image
+/ad.jpg$image
+/ad.jpeg$image
+/ad.png$image
+/ad.webp$image
+/ads.gif$image
+/ads.jpg$image
+/ads.jpeg$image
+/ads.png$image
+/banner.gif$image
+/banner.jpg$image
+/banner.jpeg$image
+/banner.png$image
+/banners/$image
+/advertising/$image
+/advertisement/$image
+
+! Sentry – all variants
+||sentry.io^$script
+||o1.ingest.sentry.io^
+||o2.ingest.sentry.io^
+||o3.ingest.sentry.io^
+||o4.ingest.sentry.io^
+||o5.ingest.sentry.io^
+||o*.ingest.sentry.io^
+||cdn.ravenjs.com^
+||ravenjs.com^
+||browser.sentry-cdn.com^$script
+/sentry.min.js^
+/sentry.bundle.min.js^
+/bundle.tracing.min.js^
+
+! Bugsnag
+||bugsnag.com^$script
+||d2wy8f7a9ursnm.cloudfront.net^
+/bugsnag.min.js^
+/bugsnag-*.min.js^
+
+! Rollbar
+||rollbar.com^$script
+||d37gvrvc0wt4s1.cloudfront.net^
+/rollbar.min.js^
+/rollbar.js^
+
+! LogRocket
+||logrocket.com^$script
+||cdn.logrocket.io^
+||r.logrocket.io^
+
+! Datadog
+||datadoghq.com^$script
+||browser-intake-datadoghq.com^
+||logs.browser-intake-datadoghq.com^
+/datadog-rum.js^
+/datadog-logs.js^
+
+! ════════════════════════════════════════
+! ADBLOCK-TESTER EXACT URL FIXES v3.0
+! ════════════════════════════════════════
+
+! Google Analytics – All CDN variants
+||google-analytics.com^
+||analytics.google.com^
+||ssl.google-analytics.com^
+||www.google-analytics.com^
+||googletagmanager.com^
+||googletagservices.com^
+||google-analytics.com/analytics.js^
+||google-analytics.com/ga.js^
+||google-analytics.com/gtag/js^
+||google-analytics.com/collect^
+||googletagmanager.com/gtm.js^
+||googletagmanager.com/gtag/js^
+
+! Sentry – Exact URLs
+||browser.sentry-cdn.com^
+||browser.sentry-cdn.com/7.99.0/bundle.min.js^
+||browser.sentry-cdn.com/7.*/bundle.min.js^
+||sentry.io^
+||ingest.sentry.io^
+||o1.ingest.sentry.io^
+||o4504935537270784.ingest.sentry.io^
+||cdn.ravenjs.com^
+||ravenjs.com^
+
+! Image ads – adblock-tester specific patterns
+/ads/banner.$image
+/ads/728x90.$image
+/ads/300x250.$image
+/ads/160x600.$image
+/ads/120x600.$image
+/ads/468x60.$image
+/ads/320x50.$image
+||adblock-tester.com/images/ad*^
+||adblock-tester.com/*/ad.*^
+||adblock-tester.com/*/ads.*^
+||adblock-tester.com/*/banner.*^
+||adblock-tester.com/*/gif.*^
+/test-ads/$image
+/test_ads/$image
+/testads/$image
+/fake-ad.$image
+/fake_ad.$image
+*.gif$image,domain=adblock-tester.com
+*.jpg$image,domain=adblock-tester.com
+*.png$image,domain=adblock-tester.com

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrivShield</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="ps-header">
+    <div class="ps-logo">
+      <span class="ps-logo-icon">🛡</span>
+      <div class="ps-logo-text">
+        <span class="ps-brand">PrivShield</span>
+        <span class="ps-tagline">by PrivMITLab</span>
+      </div>
+    </div>
+    <span class="ps-version">v2.0.0</span>
+  </header>
+
+  <!-- SITE STATUS -->
+  <div class="ps-site-bar">
+    <div class="ps-site-info">
+      <span class="ps-site-icon" id="siteStatusIcon">🟢</span>
+      <div class="ps-site-details">
+        <span class="ps-site-hostname" id="currentHostname">Loading...</span>
+        <span class="ps-site-status" id="siteStatus">Protected</span>
+      </div>
+    </div>
+    <div class="ps-tab-count-wrap">
+      <span class="ps-tab-count-label">Blocked</span>
+      <span class="ps-tab-count" id="tabBlockCount">0</span>
+    </div>
+  </div>
+
+  <!-- MASTER TOGGLE -->
+  <div class="ps-master-toggle-wrap">
+    <div class="ps-toggle-group ps-master">
+      <div class="ps-toggle-info">
+        <span class="ps-toggle-name">PrivShield Protection</span>
+        <span class="ps-toggle-desc">Global on/off switch</span>
+      </div>
+      <label class="ps-toggle-switch">
+        <input type="checkbox" id="toggleGlobal" />
+        <span class="ps-slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- QUICK STATS -->
+  <div class="ps-stats-row">
+    <div class="ps-stat-card">
+      <span class="ps-stat-num" id="statTotal">0</span>
+      <span class="ps-stat-label">Blocked</span>
+    </div>
+    <div class="ps-stat-card">
+      <span class="ps-stat-num stat-green" id="statRedirect">0</span>
+      <span class="ps-stat-label">Redirected</span>
+    </div>
+    <div class="ps-stat-card">
+      <span class="ps-stat-num stat-blue" id="statRules">0</span>
+      <span class="ps-stat-label">Rules</span>
+    </div>
+  </div>
+
+  <!-- SEARCH ENGINE STATUS -->
+  <div class="ps-section">
+    <div class="ps-section-title">🔍 Search Privacy</div>
+
+    <div class="ps-toggle-group">
+      <div class="ps-toggle-info">
+        <span class="ps-toggle-name">🔒 Private Search</span>
+        <span class="ps-toggle-desc">Redirect to privacy engine</span>
+      </div>
+      <label class="ps-toggle-switch">
+        <input type="checkbox" id="toggleSearchRedirect" />
+        <span class="ps-slider"></span>
+      </label>
+    </div>
+
+    <!-- Quick Engine Switcher -->
+    <div class="ps-engine-row" id="engineRow">
+      <span class="ps-engine-label">Engine:</span>
+      <div class="ps-engine-btns">
+        <button class="ps-engine-btn" data-engine="duckduckgo" id="btnDDG">
+          🦆 DuckDuckGo
+        </button>
+        <button class="ps-engine-btn" data-engine="brave" id="btnBrave">
+          🦁 Brave
+        </button>
+        <button class="ps-engine-btn" data-engine="startpage" id="btnStartpage">
+          🔒 Startpage
+        </button>
+      </div>
+    </div>
+
+    <div class="ps-toggle-group">
+      <div class="ps-toggle-info">
+        <span class="ps-toggle-name">🧹 Clean Tracking URLs</span>
+        <span class="ps-toggle-desc">Remove utm_*, fbclid, gclid...</span>
+      </div>
+      <label class="ps-toggle-switch">
+        <input type="checkbox" id="toggleCleanURLs" />
+        <span class="ps-slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- THIS SITE -->
+  <div class="ps-section">
+    <div class="ps-section-title">This Site</div>
+
+    <div class="ps-toggle-group">
+      <div class="ps-toggle-info">
+        <span class="ps-toggle-name">🛡 Protection</span>
+        <span class="ps-toggle-desc">Enable for this site</span>
+      </div>
+      <label class="ps-toggle-switch">
+        <input type="checkbox" id="toggleSite" />
+        <span class="ps-slider"></span>
+      </label>
+    </div>
+
+    <div class="ps-toggle-group">
+      <div class="ps-toggle-info">
+        <span class="ps-toggle-name">📜 Block Scripts</span>
+        <span class="ps-toggle-desc">Disable JavaScript here</span>
+      </div>
+      <label class="ps-toggle-switch">
+        <input type="checkbox" id="toggleSiteScripts" />
+        <span class="ps-slider"></span>
+      </label>
+    </div>
+
+    <div class="ps-toggle-group">
+      <div class="ps-toggle-info">
+        <span class="ps-toggle-name">🔒 Strict Mode</span>
+        <span class="ps-toggle-desc">Block all third-party</span>
+      </div>
+      <label class="ps-toggle-switch">
+        <input type="checkbox" id="toggleSiteStrict" />
+        <span class="ps-slider"></span>
+      </label>
+    </div>
+
+    <button class="ps-btn ps-btn-allow" id="btnWhitelist">
+      <span id="whitelistBtnText">☑ Add to Allowlist</span>
+    </button>
+  </div>
+
+  <!-- GLOBAL OPTIONS -->
+  <div class="ps-section">
+    <div class="ps-section-title">Global Options</div>
+
+    <div class="ps-toggle-group">
+      <div class="ps-toggle-info">
+        <span class="ps-toggle-name">🧬 Fingerprint Block</span>
+        <span class="ps-toggle-desc">Canvas/WebGL protection</span>
+      </div>
+      <label class="ps-toggle-switch">
+        <input type="checkbox" id="toggleFingerprint" />
+        <span class="ps-slider"></span>
+      </label>
+    </div>
+
+    <div class="ps-toggle-group">
+      <div class="ps-toggle-info">
+        <span class="ps-toggle-name">🔗 Strip Referrer</span>
+        <span class="ps-toggle-desc">Remove cross-site referrer</span>
+      </div>
+      <label class="ps-toggle-switch">
+        <input type="checkbox" id="toggleReferrer" />
+        <span class="ps-slider"></span>
+      </label>
+    </div>
+
+    <div class="ps-toggle-group">
+      <div class="ps-toggle-info">
+        <span class="ps-toggle-name">🕵 Spoof User-Agent</span>
+        <span class="ps-toggle-desc">Use generic browser string</span>
+      </div>
+      <label class="ps-toggle-switch">
+        <input type="checkbox" id="toggleUA" />
+        <span class="ps-slider"></span>
+      </label>
+    </div>
+
+    <div class="ps-toggle-group">
+      <div class="ps-toggle-info">
+        <span class="ps-toggle-name">🌐 Strict Mode</span>
+        <span class="ps-toggle-desc">Block all 3rd-party globally</span>
+      </div>
+      <label class="ps-toggle-switch">
+        <input type="checkbox" id="toggleStrict" />
+        <span class="ps-slider"></span>
+      </label>
+    </div>
+
+    <div class="ps-toggle-group">
+      <div class="ps-toggle-info">
+        <span class="ps-toggle-name">📜 Block All Scripts</span>
+        <span class="ps-toggle-desc">Global JavaScript blocker</span>
+      </div>
+      <label class="ps-toggle-switch">
+        <input type="checkbox" id="toggleScripts" />
+        <span class="ps-slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="ps-footer">
+    <button class="ps-btn ps-btn-secondary" id="btnDashboard">⚙ Dashboard</button>
+    <button class="ps-btn ps-btn-secondary" id="btnReload">🔄 Reload Page</button>
+  </div>
+
+  <div class="ps-toast" id="psToast"></div>
+  <script src="popup.js"></script>
+</body>
+</html>

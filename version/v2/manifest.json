@@ -1,0 +1,60 @@
+{
+  "manifest_version": 3,
+  "name": "PrivShield – Privacy Guardian",
+  "version": "2.0.0",
+  "description": "PrivMITLab: Ad blocker, tracker blocker, script control & private search. 100% local. Zero data collection.",
+  "author": "PrivMITLab",
+
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "PrivShield – Search Private. Browse Free. Stay Invisible."
+  },
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+
+  "permissions": [
+    "storage",
+    "tabs",
+    "activeTab",
+    "declarativeNetRequest",
+    "declarativeNetRequestFeedback",
+    "declarativeNetRequestWithHostAccess",
+    "scripting"
+  ],
+
+  "host_permissions": [
+    "<all_urls>"
+  ],
+
+  "declarative_net_request": {
+    "rule_resources": []
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": ["dashboard/dashboard.html"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+
+  "options_ui": {
+    "page": "dashboard/dashboard.html",
+    "open_in_tab": true
+  },
+
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+  }
+}
