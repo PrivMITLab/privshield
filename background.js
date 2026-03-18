@@ -1,610 +1,949 @@
 /**
  * PrivShield – Background Service Worker
- * PrivMITLab | https://github.com/privmitlab/privshield
+ * PrivMITLab v2.0.0
  *
- * Responsibilities:
- *  - Load and parse filter lists from storage
- *  - Intercept network requests via webRequest API
- *  - Apply blocking decisions based on filter engine
- *  - Manage per-site settings
- *  - Log blocked requests locally
- *  - Handle messages from popup and dashboard
- *
- * PRIVACY: No external calls. No telemetry. All local.
+ * Fixed:
+ *  - Double initialization removed
+ *  - Live block count via getMatchedRules
+ *  - Search redirect via tabs.onUpdated
+ *  - Tracking URL cleaner
+ *  - Per-site whitelist via DNR
  */
 
 import { FilterEngine } from './utils/parser.js';
+import {
+    detectSearchQuery,
+    buildRedirectURL,
+    cleanTrackingParams,
+    isPrivacyEngine,
+} from './utils/searchEngine.js';
 
 // ─────────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────────
 
-const PRIVSHIELD_VERSION   = '1.0.0';
-const MAX_LOG_ENTRIES      = 500;   // Rolling log cap (performance)
+const PRIVSHIELD_VERSION = '2.0.0';
+const MAX_LOG_ENTRIES = 500;
 const DEFAULT_FILTERS_PATH = '/filters/default_filters.txt';
+const MAX_DNR_RULES = 4900;
+const BATCH_SIZE = 200;
 
-// Request types we can intercept
-const BLOCKABLE_TYPES = [
-  'script',
-  'image',
-  'stylesheet',
-  'object',
-  'xmlhttprequest',
-  'ping',
-  'beacon',
-  'media',
-  'font',
-  'other'
-];
+const STRICT_RULE_ID = 4999;
+const SCRIPT_RULE_ID = 4998;
+const WHITELIST_ID_START = 4000;
+const FILTER_ID_END = 3999;
 
 // ─────────────────────────────────────────────
-// STATE (in-memory, ephemeral per service worker)
+// STATE
 // ─────────────────────────────────────────────
 
 const state = {
-  engine:           null,   // FilterEngine instance
-  enabled:          true,   // Global ON/OFF
-  strictMode:       false,  // Block all third-party
-  scriptBlock:      false,  // Block all scripts globally
-  spoofUserAgent:   false,  // UA spoofing toggle
-  stripReferrer:    true,   // Strip referrer headers
-  blockFingerprint: true,   // Block fingerprinting scripts
-  siteSettings:     {},     // { hostname: { enabled, allowScripts, ... } }
-  blockedLog:       [],     // Rolling array of blocked request entries
-  blockCount:       0,      // Total blocked since install
-  sessionCount:     0,      // Blocked this session
+    engine: null,
+    enabled: true,
+    strictMode: false,
+    scriptBlock: false,
+    blockFingerprint: true,
+    spoofUserAgent: false,
+    stripReferrer: true,
+    searchRedirect: true,
+    searchEngine: 'duckduckgo',
+    customSearchURL: '',
+    cleanTrackingURLs: true,
+    blockNonPrivate: false,
+    siteSettings: {},
+    blockedLog: [],
+    blockCount: 0,
+    sessionCount: 0,
+    redirectCount: 0,
 };
+
+const tabBlockCounts = new Map();
+const tabRedirectCounts = new Map();
+const tabLastCheck = new Map();
 
 // ─────────────────────────────────────────────
 // INITIALIZATION
 // ─────────────────────────────────────────────
 
-/**
- * Boot sequence:
- * 1. Load persisted settings from storage
- * 2. Load filter lists (cached or default)
- * 3. Compile filter engine
- * 4. Register request interceptors
- */
 async function initialize() {
-  console.log(`[PrivShield] v${PRIVSHIELD_VERSION} initializing...`);
-
-  try {
-    await loadSettings();
-    await loadAndCompileFilters();
-    registerRequestInterceptors();
-    console.log('[PrivShield] Ready. Protection active.');
-  } catch (err) {
-    console.error('[PrivShield] Initialization error:', err);
-  }
+    console.log(`[PrivShield] v${PRIVSHIELD_VERSION} initializing...`);
+    try {
+        await loadSettings();
+        await clearAllDNRRules();
+        await loadAndCompileFilters();
+        console.log('[PrivShield] ✅ Ready!');
+    } catch (err) {
+        console.error('[PrivShield] Init error:', err);
+    }
 }
 
 // ─────────────────────────────────────────────
-// SETTINGS MANAGEMENT
+// CLEAR ALL DNR RULES
+// ─────────────────────────────────────────────
+
+async function clearAllDNRRules() {
+    try {
+        const existing = await chrome.declarativeNetRequest.getDynamicRules();
+        if (existing.length === 0) {
+            console.log('[PrivShield] No existing rules to clear.');
+            return;
+        }
+        const ids = existing.map(r => r.id);
+        await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: ids });
+        console.log(`[PrivShield] Cleared ${ids.length} existing rules.`);
+    } catch {
+        try {
+            const bruteIds = Array.from({ length: 5000 }, (_, i) => i + 1);
+            await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: bruteIds });
+            console.log('[PrivShield] Brute force clear done.');
+        } catch (err2) {
+            console.error('[PrivShield] Clear failed:', err2.message);
+        }
+    }
+}
+
+// ─────────────────────────────────────────────
+// SETTINGS
 // ─────────────────────────────────────────────
 
 async function loadSettings() {
-  const stored = await chrome.storage.local.get([
-    'enabled',
-    'strictMode',
-    'scriptBlock',
-    'spoofUserAgent',
-    'stripReferrer',
-    'blockFingerprint',
-    'siteSettings',
-    'blockCount',
-    'blockedLog',
-    'customRules',
-    'filterLists',
-  ]);
+    const stored = await chrome.storage.local.get([
+        'enabled', 'strictMode', 'scriptBlock', 'spoofUserAgent',
+        'stripReferrer', 'blockFingerprint', 'siteSettings',
+        'blockCount', 'sessionCount', 'blockedLog', 'customRules',
+        'filterLists', 'searchRedirect', 'searchEngine',
+        'customSearchURL', 'cleanTrackingURLs', 'blockNonPrivate',
+        'redirectCount',
+    ]);
 
-  // Merge stored settings into state (use defaults if not set)
-  if (typeof stored.enabled       === 'boolean') state.enabled       = stored.enabled;
-  if (typeof stored.strictMode    === 'boolean') state.strictMode    = stored.strictMode;
-  if (typeof stored.scriptBlock   === 'boolean') state.scriptBlock   = stored.scriptBlock;
-  if (typeof stored.spoofUserAgent=== 'boolean') state.spoofUserAgent= stored.spoofUserAgent;
-  if (typeof stored.stripReferrer === 'boolean') state.stripReferrer = stored.stripReferrer;
-  if (typeof stored.blockFingerprint === 'boolean') state.blockFingerprint = stored.blockFingerprint;
+    const bools = [
+        'enabled', 'strictMode', 'scriptBlock', 'spoofUserAgent',
+        'stripReferrer', 'blockFingerprint', 'searchRedirect',
+        'cleanTrackingURLs', 'blockNonPrivate',
+    ];
 
-  if (stored.siteSettings && typeof stored.siteSettings === 'object') {
-    state.siteSettings = stored.siteSettings;
-  }
+    for (const key of bools) {
+        if (typeof stored[key] === 'boolean') state[key] = stored[key];
+    }
 
-  if (typeof stored.blockCount === 'number') {
-    state.blockCount = stored.blockCount;
-  }
+    if (typeof stored.searchEngine === 'string') state.searchEngine = stored.searchEngine;
+    if (typeof stored.customSearchURL === 'string') state.customSearchURL = stored.customSearchURL;
 
-  if (Array.isArray(stored.blockedLog)) {
-    state.blockedLog = stored.blockedLog.slice(-MAX_LOG_ENTRIES);
-  }
+    if (stored.siteSettings && typeof stored.siteSettings === 'object') {
+        state.siteSettings = stored.siteSettings;
+    }
 
-  console.log('[PrivShield] Settings loaded:', {
-    enabled:       state.enabled,
-    strictMode:    state.strictMode,
-    scriptBlock:   state.scriptBlock,
-    stripReferrer: state.stripReferrer,
-  });
+    if (typeof stored.blockCount === 'number') state.blockCount = stored.blockCount;
+    if (typeof stored.sessionCount === 'number') state.sessionCount = stored.sessionCount;
+    if (typeof stored.redirectCount === 'number') state.redirectCount = stored.redirectCount;
+
+    if (Array.isArray(stored.blockedLog)) {
+        state.blockedLog = stored.blockedLog.slice(-MAX_LOG_ENTRIES);
+    }
+
+    console.log('[PrivShield] Settings loaded.');
 }
 
 async function saveSettings() {
-  await chrome.storage.local.set({
-    enabled:          state.enabled,
-    strictMode:       state.strictMode,
-    scriptBlock:      state.scriptBlock,
-    spoofUserAgent:   state.spoofUserAgent,
-    stripReferrer:    state.stripReferrer,
-    blockFingerprint: state.blockFingerprint,
-    siteSettings:     state.siteSettings,
-    blockCount:       state.blockCount,
-    blockedLog:       state.blockedLog.slice(-MAX_LOG_ENTRIES),
-  });
+    await chrome.storage.local.set({
+        enabled: state.enabled,
+        strictMode: state.strictMode,
+        scriptBlock: state.scriptBlock,
+        spoofUserAgent: state.spoofUserAgent,
+        stripReferrer: state.stripReferrer,
+        blockFingerprint: state.blockFingerprint,
+        searchRedirect: state.searchRedirect,
+        searchEngine: state.searchEngine,
+        customSearchURL: state.customSearchURL,
+        cleanTrackingURLs: state.cleanTrackingURLs,
+        blockNonPrivate: state.blockNonPrivate,
+        siteSettings: state.siteSettings,
+        blockCount: state.blockCount,
+        sessionCount: state.sessionCount,
+        redirectCount: state.redirectCount,
+        blockedLog: state.blockedLog.slice(-MAX_LOG_ENTRIES),
+    });
+}
+
+let saveTimer = null;
+function scheduleSettingsSave() {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+        saveSettings();
+        saveTimer = null;
+    }, 2000);
 }
 
 // ─────────────────────────────────────────────
-// FILTER LIST LOADING & COMPILATION
+// FILTER LOADING & COMPILATION
 // ─────────────────────────────────────────────
 
 async function loadAndCompileFilters() {
-  let rawRules = '';
+    let rawRules = '';
 
-  // 1. Load default bundled filter list
-  try {
-    const response = await fetch(chrome.runtime.getURL(DEFAULT_FILTERS_PATH));
-    rawRules = await response.text();
-    console.log('[PrivShield] Default filters loaded:', rawRules.split('\n').length, 'lines');
-  } catch (err) {
-    console.warn('[PrivShield] Failed to load default filters:', err);
-  }
-
-  // 2. Load cached external filter lists from storage
-  const stored = await chrome.storage.local.get(['filterLists', 'customRules']);
-
-  if (stored.filterLists && typeof stored.filterLists === 'object') {
-    for (const [name, content] of Object.entries(stored.filterLists)) {
-      if (typeof content === 'string' && content.length > 0) {
-        rawRules += '\n' + content;
-        console.log(`[PrivShield] Loaded cached list: ${name}`);
-      }
+    try {
+        const response = await fetch(chrome.runtime.getURL(DEFAULT_FILTERS_PATH));
+        rawRules = await response.text();
+        console.log('[PrivShield] Default filters loaded.');
+    } catch (err) {
+        console.warn('[PrivShield] Default filters failed:', err.message);
     }
-  }
 
-  // 3. Append custom user rules
-  if (typeof stored.customRules === 'string' && stored.customRules.trim()) {
-    rawRules += '\n' + stored.customRules;
-    console.log('[PrivShield] Custom user rules appended');
-  }
+    const stored = await chrome.storage.local.get(['filterLists', 'customRules']);
 
-  // 4. Compile into engine
-  state.engine = new FilterEngine();
-  state.engine.compile(rawRules);
+    if (stored.filterLists && typeof stored.filterLists === 'object') {
+        for (const [name, content] of Object.entries(stored.filterLists)) {
+            if (typeof content === 'string' && content.length > 0) {
+                rawRules += '\n' + content;
+                console.log(`[PrivShield] Loaded: ${name}`);
+            }
+        }
+    }
 
-  console.log('[PrivShield] Filter engine compiled.');
-  console.log('[PrivShield] Stats:', state.engine.getStats());
+    if (typeof stored.customRules === 'string' && stored.customRules.trim()) {
+        rawRules += '\n' + stored.customRules;
+    }
+
+    state.engine = new FilterEngine();
+    state.engine.compile(rawRules);
+    console.log('[PrivShield] Engine stats:', state.engine.getStats());
+
+    await applyDeclarativeRules(rawRules);
+
+    if (state.strictMode) await applyStrictModeRules();
+    if (state.scriptBlock) await applyScriptBlockRules();
+    await reapplyWhitelists();
 }
 
 // ─────────────────────────────────────────────
-// REQUEST INTERCEPTORS
+// DECLARATIVE NET REQUEST
 // ─────────────────────────────────────────────
 
-function registerRequestInterceptors() {
-  // Block requests based on filter engine
-  chrome.webRequest.onBeforeRequest.addListener(
-    handleBeforeRequest,
-    { urls: ['<all_urls>'] },
-    ['blocking']
-  );
+async function applyDeclarativeRules(rawRules) {
+    try {
+        const dnrRules = convertToDNR(rawRules);
+        if (dnrRules.length === 0) {
+            console.log('[PrivShield] No DNR rules to apply.');
+            return;
+        }
 
-  // Modify headers (referrer stripping, UA spoofing)
-  chrome.webRequest.onBeforeSendHeaders.addListener(
-    handleBeforeSendHeaders,
-    { urls: ['<all_urls>'] },
-    ['blocking', 'requestHeaders']
-  );
+        const limited = dnrRules.slice(0, FILTER_ID_END);
+        let added = 0;
 
-  console.log('[PrivShield] Request interceptors registered.');
+        for (let i = 0; i < limited.length; i += BATCH_SIZE) {
+            const batch = limited.slice(i, i + BATCH_SIZE);
+            try {
+                await chrome.declarativeNetRequest.updateDynamicRules({ addRules: batch });
+                added += batch.length;
+            } catch {
+                for (const rule of batch) {
+                    try {
+                        await chrome.declarativeNetRequest.updateDynamicRules({ addRules: [rule] });
+                        added++;
+                    } catch { /* skip bad rule */ }
+                }
+            }
+        }
+
+        console.log(`[PrivShield] ✅ DNR rules applied: ${added}`);
+    } catch (err) {
+        console.error('[PrivShield] DNR apply error:', err.message);
+        await nuclearClearAndRetry(rawRules);
+    }
 }
 
-/**
- * Main request decision handler.
- * Returns { cancel: true } to block, or {} to allow.
- */
-function handleBeforeRequest(details) {
-  // Don't intercept extension's own requests
-  if (details.url.startsWith(chrome.runtime.getURL(''))) {
-    return {};
-  }
-
-  // Global kill switch
-  if (!state.enabled) {
-    return {};
-  }
-
-  const url       = details.url;
-  const tabId     = details.tabId;
-  const type      = details.type;
-  const initiator = details.initiator || details.documentUrl || '';
-
-  // Extract hostname of the request target
-  const requestHost   = extractHostname(url);
-  const initiatorHost = extractHostname(initiator);
-
-  // Per-site override: if site is whitelisted, allow everything
-  if (isSiteWhitelisted(initiatorHost)) {
-    return {};
-  }
-
-  // Check per-site settings
-  const siteConfig = state.siteSettings[initiatorHost] || {};
-
-  // If protection disabled for this site
-  if (siteConfig.enabled === false) {
-    return {};
-  }
-
-  // Strict mode: block ALL third-party requests
-  if ((state.strictMode || siteConfig.strictMode) &&
-      requestHost &&
-      initiatorHost &&
-      requestHost !== initiatorHost &&
-      !isSubdomain(requestHost, initiatorHost)) {
-
-    const shouldBlock = true;
-    if (shouldBlock) {
-      logBlockedRequest({
-        url,
-        type,
-        reason: 'strict-mode-third-party',
-        requestHost,
-        initiatorHost,
-        tabId,
-        timestamp: Date.now(),
-      });
-      return { cancel: true };
+async function nuclearClearAndRetry(rawRules) {
+    try {
+        const ids = Array.from({ length: 4000 }, (_, i) => i + 1);
+        await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: ids });
+        const dnrRules = convertToDNR(rawRules);
+        const limited = dnrRules.slice(0, 500);
+        if (limited.length > 0) {
+            await chrome.declarativeNetRequest.updateDynamicRules({ addRules: limited });
+            console.log(`[PrivShield] Nuclear retry OK: ${limited.length} rules`);
+        }
+    } catch (err) {
+        console.error('[PrivShield] Nuclear retry failed:', err.message);
     }
-  }
-
-  // Script blocking (global or per-site)
-  if (type === 'script') {
-    const blockScripts = state.scriptBlock || siteConfig.blockScripts;
-    if (blockScripts) {
-      logBlockedRequest({
-        url,
-        type,
-        reason: 'script-block',
-        requestHost,
-        initiatorHost,
-        tabId,
-        timestamp: Date.now(),
-      });
-      return { cancel: true };
-    }
-  }
-
-  // Filter engine matching
-  if (state.engine) {
-    const decision = state.engine.shouldBlock({
-      url,
-      type,
-      requestHost,
-      initiatorHost,
-      isThirdParty: requestHost !== initiatorHost,
-    });
-
-    if (decision.block) {
-      logBlockedRequest({
-        url,
-        type,
-        reason:       decision.reason || 'filter-match',
-        rule:         decision.rule   || '',
-        requestHost,
-        initiatorHost,
-        tabId,
-        timestamp:    Date.now(),
-      });
-
-      // Update badge
-      updateBadge(tabId);
-
-      return { cancel: true };
-    }
-  }
-
-  return {};
-}
-
-/**
- * Header modification handler.
- * Strips Referer header, optionally spoofs User-Agent.
- */
-function handleBeforeSendHeaders(details) {
-  if (!state.enabled) return {};
-
-  const initiator     = details.initiator || '';
-  const initiatorHost = extractHostname(initiator);
-
-  if (isSiteWhitelisted(initiatorHost)) return {};
-
-  const headers = details.requestHeaders || [];
-  const modified = [];
-  let changed = false;
-
-  for (const header of headers) {
-    const name = header.name.toLowerCase();
-
-    // Strip Referer header (prevents cross-site tracking via referrer)
-    if (name === 'referer' && state.stripReferrer) {
-      const refererHost = extractHostname(header.value);
-      const targetHost  = extractHostname(details.url);
-
-      // Only strip cross-origin referrers
-      if (refererHost && targetHost && refererHost !== targetHost) {
-        changed = true;
-        // Don't push — effectively removes the header
-        continue;
-      }
-    }
-
-    // Spoof User-Agent if enabled
-    if (name === 'user-agent' && state.spoofUserAgent) {
-      modified.push({
-        name:  'User-Agent',
-        value: getGenericUserAgent(),
-      });
-      changed = true;
-      continue;
-    }
-
-    modified.push(header);
-  }
-
-  if (changed) {
-    return { requestHeaders: modified };
-  }
-
-  return {};
 }
 
 // ─────────────────────────────────────────────
-// LOGGING
+// RULE CONVERSION – Adblock → DNR
 // ─────────────────────────────────────────────
 
-function logBlockedRequest(entry) {
-  // Increment counters
-  state.blockCount++;
-  state.sessionCount++;
+function convertToDNR(rawText) {
+    const rules = [];
+    const usedIds = new Set();
+    const seenFilters = new Set();
+    let nextId = 1;
 
-  // Add to rolling log
-  state.blockedLog.push(entry);
+    function getNextId() {
+        while (usedIds.has(nextId) || nextId >= WHITELIST_ID_START) nextId++;
+        usedIds.add(nextId);
+        return nextId++;
+    }
 
-  // Cap log size
-  if (state.blockedLog.length > MAX_LOG_ENTRIES) {
-    state.blockedLog = state.blockedLog.slice(-MAX_LOG_ENTRIES);
-  }
+    const TYPE_MAP = {
+        'script': 'script',
+        'image': 'image',
+        'stylesheet': 'stylesheet',
+        'object': 'object',
+        'xmlhttprequest': 'xmlhttprequest',
+        'subdocument': 'sub_frame',
+        'ping': 'ping',
+        'media': 'media',
+        'font': 'font',
+        'other': 'other',
+    };
 
-  // Persist counters (debounced via save queue)
-  scheduleSettingsSave();
+    for (const line of rawText.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        if (trimmed.startsWith('!')) continue;
+        if (trimmed.startsWith('#')) continue;
+        if (trimmed.startsWith('[')) continue;
+        if (trimmed.includes('##')) continue;
+        if (trimmed.includes('#?#')) continue;
+        if (trimmed.includes('#$#')) continue;
+        if (trimmed.includes('#@#')) continue;
+        if (trimmed.includes('$domain=') &&
+            trimmed.split('domain=')[1]?.includes('~')) continue;
+
+        if (rules.length >= FILTER_ID_END) break;
+
+        try {
+            const id = getNextId();
+            let rule = null;
+
+            if (trimmed.startsWith('@@')) {
+                rule = parseAllowRule(trimmed.slice(2), id, TYPE_MAP);
+            } else {
+                rule = parseBlockRule(trimmed, id, TYPE_MAP);
+            }
+
+            if (!rule) { usedIds.delete(id); continue; }
+
+            const dedupeKey = rule.action.type + '|' + (rule.condition.urlFilter || '');
+            if (seenFilters.has(dedupeKey)) { usedIds.delete(rule.id); continue; }
+            seenFilters.add(dedupeKey);
+
+            rules.push(rule);
+        } catch { /* skip */ }
+    }
+
+    console.log(`[PrivShield] Converted ${rules.length} rules.`);
+    return rules;
 }
 
-// Debounced save to avoid excessive storage writes
-let saveTimer = null;
-function scheduleSettingsSave() {
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    saveSettings();
-    saveTimer = null;
-  }, 2000);
+function parseBlockRule(line, id, TYPE_MAP) {
+    let pattern = line, resourceTypes = null, domainType = null;
+
+    const dollarIdx = findOptionsDollar(line);
+    if (dollarIdx !== -1) {
+        const optStr = line.slice(dollarIdx + 1);
+        pattern = line.slice(0, dollarIdx);
+        const parsed = parseOptions(optStr, TYPE_MAP);
+        resourceTypes = parsed.types;
+        domainType = parsed.domainType;
+    }
+
+    const urlFilter = buildUrlFilter(pattern);
+    if (!urlFilter) return null;
+
+    const rule = {
+        id,
+        priority: 1,
+        action: { type: 'block' },
+        condition: {
+            urlFilter,
+            isUrlFilterCaseSensitive: false,
+            resourceTypes: resourceTypes?.length > 0 ? resourceTypes : [
+                'script', 'image', 'stylesheet', 'object',
+                'xmlhttprequest', 'ping', 'media', 'font', 'sub_frame', 'other',
+            ],
+        },
+    };
+
+    if (domainType) rule.condition.domainType = domainType;
+    return rule;
+}
+
+function parseAllowRule(line, id, TYPE_MAP) {
+    let pattern = line;
+    const dolIdx = findOptionsDollar(line);
+    if (dolIdx !== -1) pattern = line.slice(0, dolIdx);
+
+    const urlFilter = buildUrlFilter(pattern);
+    if (!urlFilter) return null;
+
+    return {
+        id,
+        priority: 10,
+        action: { type: 'allow' },
+        condition: {
+            urlFilter,
+            isUrlFilterCaseSensitive: false,
+            resourceTypes: [
+                'main_frame', 'script', 'image', 'stylesheet', 'object',
+                'xmlhttprequest', 'ping', 'media', 'font', 'sub_frame', 'other',
+            ],
+        },
+    };
+}
+
+function findOptionsDollar(line) {
+    if (line.startsWith('/')) {
+        const closeSlash = line.lastIndexOf('/');
+        if (closeSlash > 0) return line.indexOf('$', closeSlash);
+    }
+    return line.lastIndexOf('$');
+}
+
+function parseOptions(optStr, TYPE_MAP) {
+    const types = [];
+    let domainType = null;
+
+    for (const part of optStr.split(',')) {
+        const p = part.trim().toLowerCase();
+        if (!p) continue;
+        if (p === 'third-party' || p === '3p') { domainType = 'thirdParty'; continue; }
+        if (p === '~third-party' || p === '~3p' ||
+            p === 'first-party' || p === '1p') { domainType = 'firstParty'; continue; }
+        if (TYPE_MAP[p]) types.push(TYPE_MAP[p]);
+    }
+
+    return { types: types.length > 0 ? types : null, domainType };
+}
+
+function buildUrlFilter(pattern) {
+    if (!pattern || pattern.length < 3) return null;
+    if (pattern.startsWith('/') && pattern.lastIndexOf('/') > 0) return null;
+
+    if (pattern.startsWith('||')) {
+        const domain = pattern.slice(2).replace(/[\^*|]+$/, '').trim();
+        if (!domain || domain.length < 3) return null;
+        return '||' + domain;
+    }
+
+    if (pattern.startsWith('|') && !pattern.startsWith('||')) {
+        const rest = pattern.slice(1);
+        if (rest.length < 4) return null;
+        return rest;
+    }
+
+    if (pattern.length < 6) return null;
+    return pattern.replace(/\^/g, '*');
 }
 
 // ─────────────────────────────────────────────
-// BADGE
+// SPECIAL DNR RULES
 // ─────────────────────────────────────────────
 
-const tabBlockCounts = new Map(); // { tabId: count }
+async function applyStrictModeRules() {
+    try {
+        await chrome.declarativeNetRequest.updateDynamicRules({
+            removeRuleIds: [STRICT_RULE_ID],
+        });
+        if (!state.strictMode) return;
 
-function updateBadge(tabId) {
-  if (!tabId || tabId < 0) return;
-
-  const current = tabBlockCounts.get(tabId) || 0;
-  const updated = current + 1;
-  tabBlockCounts.set(tabId, updated);
-
-  chrome.action.setBadgeText({
-    text:  updated > 999 ? '999+' : String(updated),
-    tabId: tabId,
-  }).catch(() => {});
-
-  chrome.action.setBadgeBackgroundColor({
-    color: '#e74c3c',
-    tabId: tabId,
-  }).catch(() => {});
+        await chrome.declarativeNetRequest.updateDynamicRules({
+            addRules: [{
+                id: STRICT_RULE_ID,
+                priority: 2,
+                action: { type: 'block' },
+                condition: {
+                    domainType: 'thirdParty',
+                    resourceTypes: [
+                        'script', 'image', 'stylesheet', 'object',
+                        'xmlhttprequest', 'ping', 'media', 'font', 'sub_frame', 'other',
+                    ],
+                },
+            }],
+        });
+        console.log('[PrivShield] Strict mode ON');
+    } catch (err) {
+        console.error('[PrivShield] Strict mode error:', err.message);
+    }
 }
 
-// Reset badge when tab navigates
-chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-  if (changeInfo.status === 'loading') {
-    tabBlockCounts.set(tabId, 0);
-    chrome.action.setBadgeText({ text: '', tabId }).catch(() => {});
-  }
+async function applyScriptBlockRules() {
+    try {
+        await chrome.declarativeNetRequest.updateDynamicRules({
+            removeRuleIds: [SCRIPT_RULE_ID],
+        });
+        if (!state.scriptBlock) return;
+
+        await chrome.declarativeNetRequest.updateDynamicRules({
+            addRules: [{
+                id: SCRIPT_RULE_ID,
+                priority: 2,
+                action: { type: 'block' },
+                condition: { resourceTypes: ['script'] },
+            }],
+        });
+        console.log('[PrivShield] Script block ON');
+    } catch (err) {
+        console.error('[PrivShield] Script block error:', err.message);
+    }
+}
+
+async function applyWhitelistRule(host, whitelisted) {
+    try {
+        const existing = await chrome.declarativeNetRequest.getDynamicRules();
+        const existingIds = new Set(existing.map(r => r.id));
+
+        const existingRule = existing.find(r =>
+            r.priority >= 100 &&
+            r.action?.type === 'allow' &&
+            r.condition?.requestDomains?.includes(host)
+        );
+
+        if (existingRule) {
+            await chrome.declarativeNetRequest.updateDynamicRules({
+                removeRuleIds: [existingRule.id],
+            });
+        }
+
+        if (!whitelisted) return;
+
+        let newId = WHITELIST_ID_START;
+        while (existingIds.has(newId) && newId < 4900) newId++;
+        if (newId >= 4900) return;
+
+        await chrome.declarativeNetRequest.updateDynamicRules({
+            addRules: [{
+                id: newId,
+                priority: 100,
+                action: { type: 'allow' },
+                condition: {
+                    requestDomains: [host],
+                    resourceTypes: [
+                        'main_frame', 'script', 'image', 'stylesheet', 'object',
+                        'xmlhttprequest', 'ping', 'media', 'font', 'sub_frame', 'other',
+                    ],
+                },
+            }],
+        });
+        console.log(`[PrivShield] ✅ Whitelisted: ${host}`);
+    } catch (err) {
+        console.error('[PrivShield] Whitelist error:', err.message);
+    }
+}
+
+async function reapplyWhitelists() {
+    const hosts = Object.keys(state.siteSettings).filter(
+        h => state.siteSettings[h]?.whitelisted === true
+    );
+    for (const host of hosts) await applyWhitelistRule(host, true);
+    if (hosts.length > 0) {
+        console.log(`[PrivShield] Reapplied ${hosts.length} whitelists.`);
+    }
+}
+
+async function toggleDNRRules(enabled) {
+    try {
+        if (!enabled) {
+            const existing = await chrome.declarativeNetRequest.getDynamicRules();
+            const ids = existing.map(r => r.id);
+            if (ids.length > 0) {
+                await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: ids });
+                console.log(`[PrivShield] ⏸ Paused: ${ids.length} rules removed`);
+            }
+        } else {
+            await clearAllDNRRules();
+            await loadAndCompileFilters();
+        }
+    } catch (err) {
+        console.error('[PrivShield] Toggle error:', err.message);
+    }
+}
+
+// ─────────────────────────────────────────────
+// TAB TRACKING – LIVE BLOCK COUNT
+// ─────────────────────────────────────────────
+
+function trackBlocksForTab(tabId) {
+    scheduleBlockCheck(tabId, 2000);
+    scheduleBlockCheck(tabId, 5000);
+    scheduleBlockCheck(tabId, 10000);
+}
+
+function scheduleBlockCheck(tabId, delay) {
+    setTimeout(() => checkBlockedForTab(tabId), delay);
+}
+
+async function checkBlockedForTab(tabId) {
+    if (!tabId || tabId < 0) return;
+
+    try {
+        const minTime = tabLastCheck.get(tabId) || (Date.now() - 30000);
+        tabLastCheck.set(tabId, Date.now());
+
+        const result = await chrome.declarativeNetRequest.getMatchedRules({
+            tabId,
+            minTimeStamp: minTime,
+        });
+
+        const count = result?.rulesMatchInfo?.length || 0;
+
+        if (count > 0) {
+            state.blockCount += count;
+            state.sessionCount += count;
+
+            const prev = tabBlockCounts.get(tabId) || 0;
+            const updated = prev + count;
+            tabBlockCounts.set(tabId, updated);
+
+            await updateBadgeForTab(tabId);
+            scheduleSettingsSave();
+
+            console.log(`[PrivShield] Tab ${tabId}: +${count} blocked (total: ${updated})`);
+        }
+    } catch (err) {
+        // declarativeNetRequestFeedback needed – silent fail OK
+        console.debug('[PrivShield] getMatchedRules:', err.message);
+    }
+}
+
+async function updateBadgeForTab(tabId) {
+    if (!tabId || tabId < 0) return;
+
+    const blocks = tabBlockCounts.get(tabId) || 0;
+    const redirects = tabRedirectCounts.get(tabId) || 0;
+    const total = blocks + redirects;
+
+    const text = total === 0 ? '' : total > 999 ? '999+' : String(total);
+    const color = redirects > 0 ? '#3fb950' : '#e74c3c';
+
+    try {
+        await chrome.action.setBadgeText({ text, tabId });
+        await chrome.action.setBadgeBackgroundColor({ color, tabId });
+    } catch { }
+}
+
+// ─────────────────────────────────────────────
+// TABS EVENT – SEARCH REDIRECT + TRACKING CLEAN
+// ─────────────────────────────────────────────
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+
+    // Reset on new page load
+    if (changeInfo.status === 'loading' && changeInfo.url) {
+        tabBlockCounts.set(tabId, 0);
+        tabRedirectCounts.set(tabId, 0);
+        tabLastCheck.set(tabId, Date.now());
+        chrome.action.setBadgeText({ text: '', tabId }).catch(() => { });
+        trackBlocksForTab(tabId);
+    }
+
+    // Only act on URL changes
+    if (!changeInfo.url) return;
+
+    const url = changeInfo.url;
+    if (!url.startsWith('http')) return;
+    if (!state.enabled) return;
+
+    // Search redirect disabled – only clean URLs
+    if (!state.searchRedirect) {
+        if (state.cleanTrackingURLs) await handleTrackingClean(tabId, url);
+        return;
+    }
+
+    // Already a privacy engine – prevent redirect loop
+    if (isPrivacyEngine(url)) {
+        if (state.cleanTrackingURLs) await handleTrackingClean(tabId, url);
+        return;
+    }
+
+    // Detect search query
+    const detection = detectSearchQuery(url);
+
+    if (detection.isSearch && detection.query) {
+        // Check per-site settings
+        const hostname = extractHostname(url);
+        const siteCfg = state.siteSettings[hostname] || {};
+        if (siteCfg.enabled === false || siteCfg.whitelisted) return;
+
+        // Build redirect
+        const redirectUrl = buildRedirectURL(
+            state.searchEngine,
+            detection.query,
+            state.customSearchURL,
+        );
+        if (!redirectUrl) return;
+
+        console.log(`[PrivShield] 🔍 ${detection.engine} → ${state.searchEngine}: "${detection.query}"`);
+
+        // Log it
+        state.blockedLog.push({
+            type: 'search-redirect',
+            reason: 'search-redirect',
+            from: url,
+            to: redirectUrl,
+            engine: detection.engine,
+            query: detection.query,
+            tabId,
+            timestamp: Date.now(),
+        });
+        if (state.blockedLog.length > MAX_LOG_ENTRIES) {
+            state.blockedLog = state.blockedLog.slice(-MAX_LOG_ENTRIES);
+        }
+
+        // Update counters
+        state.redirectCount++;
+        tabRedirectCounts.set(tabId, (tabRedirectCounts.get(tabId) || 0) + 1);
+        updateBadgeForTab(tabId);
+        scheduleSettingsSave();
+
+        // Perform redirect
+        try {
+            await chrome.tabs.update(tabId, { url: redirectUrl });
+        } catch (err) {
+            console.warn('[PrivShield] Redirect failed:', err.message);
+        }
+        return;
+    }
+
+    // Clean tracking params from non-search URLs
+    if (state.cleanTrackingURLs) {
+        await handleTrackingClean(tabId, url);
+    }
 });
 
-// Clean up closed tabs
+async function handleTrackingClean(tabId, url) {
+    try {
+        const result = cleanTrackingParams(url);
+        if (result.changed) {
+            console.log(`[PrivShield] 🧹 Cleaned: ${result.removed.join(', ')}`);
+            await chrome.tabs.update(tabId, { url: result.cleaned });
+        }
+    } catch {
+        // Tab may have closed
+    }
+}
+
 chrome.tabs.onRemoved.addListener((tabId) => {
-  tabBlockCounts.delete(tabId);
+    tabBlockCounts.delete(tabId);
+    tabRedirectCounts.delete(tabId);
+    tabLastCheck.delete(tabId);
 });
 
 // ─────────────────────────────────────────────
-// MESSAGE HANDLER (Popup ↔ Dashboard ↔ Background)
+// MESSAGE HANDLER
 // ─────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  handleMessage(message, sender)
-    .then(sendResponse)
-    .catch(err => sendResponse({ error: err.message }));
-
-  return true; // Keep channel open for async response
+    handleMessage(message, sender)
+        .then(sendResponse)
+        .catch(err => sendResponse({ error: err.message }));
+    return true;
 });
 
 async function handleMessage(message, sender) {
-  const { action, payload } = message;
+    const { action, payload } = message;
 
-  switch (action) {
+    switch (action) {
 
-    // ── Global toggle
-    case 'GET_STATE':
-      return {
-        enabled:          state.enabled,
-        strictMode:       state.strictMode,
-        scriptBlock:      state.scriptBlock,
-        spoofUserAgent:   state.spoofUserAgent,
-        stripReferrer:    state.stripReferrer,
-        blockFingerprint: state.blockFingerprint,
-        blockCount:       state.blockCount,
-        sessionCount:     state.sessionCount,
-        engineStats:      state.engine ? state.engine.getStats() : {},
-      };
+        case 'GET_STATE':
+            return {
+                enabled: state.enabled,
+                strictMode: state.strictMode,
+                scriptBlock: state.scriptBlock,
+                spoofUserAgent: state.spoofUserAgent,
+                stripReferrer: state.stripReferrer,
+                blockFingerprint: state.blockFingerprint,
+                searchRedirect: state.searchRedirect,
+                searchEngine: state.searchEngine,
+                customSearchURL: state.customSearchURL,
+                cleanTrackingURLs: state.cleanTrackingURLs,
+                blockNonPrivate: state.blockNonPrivate,
+                blockCount: state.blockCount,
+                sessionCount: state.sessionCount,
+                redirectCount: state.redirectCount,
+                engineStats: state.engine ? state.engine.getStats() : {},
+            };
 
-    case 'SET_ENABLED':
-      state.enabled = Boolean(payload.enabled);
-      await saveSettings();
-      return { ok: true, enabled: state.enabled };
+        case 'SET_ENABLED':
+            state.enabled = Boolean(payload.enabled);
+            await saveSettings();
+            await toggleDNRRules(state.enabled);
+            return { ok: true };
 
-    case 'SET_STRICT_MODE':
-      state.strictMode = Boolean(payload.strictMode);
-      await saveSettings();
-      return { ok: true };
+        case 'SET_STRICT_MODE':
+            state.strictMode = Boolean(payload.strictMode);
+            await saveSettings();
+            await applyStrictModeRules();
+            return { ok: true };
 
-    case 'SET_SCRIPT_BLOCK':
-      state.scriptBlock = Boolean(payload.scriptBlock);
-      await saveSettings();
-      return { ok: true };
+        case 'SET_SCRIPT_BLOCK':
+            state.scriptBlock = Boolean(payload.scriptBlock);
+            await saveSettings();
+            await applyScriptBlockRules();
+            return { ok: true };
 
-    case 'SET_SPOOF_UA':
-      state.spoofUserAgent = Boolean(payload.spoofUserAgent);
-      await saveSettings();
-      return { ok: true };
+        case 'SET_SPOOF_UA':
+            state.spoofUserAgent = Boolean(payload.spoofUserAgent);
+            await saveSettings();
+            return { ok: true };
 
-    case 'SET_STRIP_REFERRER':
-      state.stripReferrer = Boolean(payload.stripReferrer);
-      await saveSettings();
-      return { ok: true };
+        case 'SET_STRIP_REFERRER':
+            state.stripReferrer = Boolean(payload.stripReferrer);
+            await saveSettings();
+            return { ok: true };
 
-    case 'SET_FINGERPRINT_BLOCK':
-      state.blockFingerprint = Boolean(payload.blockFingerprint);
-      await saveSettings();
-      return { ok: true };
+        case 'SET_FINGERPRINT_BLOCK':
+            state.blockFingerprint = Boolean(payload.blockFingerprint);
+            await saveSettings();
+            return { ok: true };
 
-    // ── Site-level settings
-    case 'GET_SITE_SETTINGS': {
-      const host = payload.host;
-      return {
-        host,
-        settings: state.siteSettings[host] || {},
-        isWhitelisted: isSiteWhitelisted(host),
-      };
+        case 'SET_SEARCH_REDIRECT':
+            state.searchRedirect = Boolean(payload.searchRedirect);
+            await saveSettings();
+            return { ok: true };
+
+        case 'SET_SEARCH_ENGINE':
+            state.searchEngine = payload.searchEngine || 'duckduckgo';
+            await saveSettings();
+            return { ok: true };
+
+        case 'SET_CUSTOM_SEARCH_URL':
+            state.customSearchURL = payload.customSearchURL || '';
+            await saveSettings();
+            return { ok: true };
+
+        case 'SET_CLEAN_TRACKING':
+            state.cleanTrackingURLs = Boolean(payload.cleanTrackingURLs);
+            await saveSettings();
+            return { ok: true };
+
+        case 'SET_BLOCK_NON_PRIVATE':
+            state.blockNonPrivate = Boolean(payload.blockNonPrivate);
+            await saveSettings();
+            return { ok: true };
+
+        case 'GET_SITE_SETTINGS': {
+            const host = payload.host;
+            return {
+                host,
+                settings: state.siteSettings[host] || {},
+                isWhitelisted: isSiteWhitelisted(host),
+            };
+        }
+
+        case 'SET_SITE_ENABLED': {
+            const { host, enabled } = payload;
+            if (!state.siteSettings[host]) state.siteSettings[host] = {};
+            state.siteSettings[host].enabled = Boolean(enabled);
+            await saveSettings();
+            return { ok: true };
+        }
+
+        case 'SET_SITE_WHITELIST': {
+            const { host, whitelisted } = payload;
+            if (!state.siteSettings[host]) state.siteSettings[host] = {};
+            state.siteSettings[host].whitelisted = Boolean(whitelisted);
+            await saveSettings();
+            await applyWhitelistRule(host, Boolean(whitelisted));
+            return { ok: true };
+        }
+
+        case 'SET_SITE_BLOCK_SCRIPTS': {
+            const { host, blockScripts } = payload;
+            if (!state.siteSettings[host]) state.siteSettings[host] = {};
+            state.siteSettings[host].blockScripts = Boolean(blockScripts);
+            await saveSettings();
+            return { ok: true };
+        }
+
+        case 'SET_SITE_STRICT': {
+            const { host, strictMode } = payload;
+            if (!state.siteSettings[host]) state.siteSettings[host] = {};
+            state.siteSettings[host].strictMode = Boolean(strictMode);
+            await saveSettings();
+            return { ok: true };
+        }
+
+        case 'GET_LOGS':
+            return {
+                logs: state.blockedLog.slice().reverse(),
+                blockCount: state.blockCount,
+                sessionCount: state.sessionCount,
+                redirectCount: state.redirectCount,
+            };
+
+        case 'CLEAR_LOGS':
+            state.blockedLog = [];
+            state.sessionCount = 0;
+            await saveSettings();
+            return { ok: true };
+
+        case 'GET_TAB_COUNT':
+            return {
+                count: tabBlockCounts.get(payload.tabId) || 0,
+                redirects: tabRedirectCounts.get(payload.tabId) || 0,
+            };
+
+        case 'UPDATE_FILTER_LIST': {
+            const { name, url: listUrl } = payload;
+            try {
+                const content = await fetchFilterList(listUrl);
+                const stored = await chrome.storage.local.get('filterLists');
+                const lists = stored.filterLists || {};
+                lists[name] = content;
+                await chrome.storage.local.set({ filterLists: lists });
+                await clearAllDNRRules();
+                await loadAndCompileFilters();
+                return { ok: true, lines: content.split('\n').length };
+            } catch (err) {
+                return { ok: false, error: err.message };
+            }
+        }
+
+        case 'REMOVE_FILTER_LIST': {
+            const { name } = payload;
+            const stored = await chrome.storage.local.get('filterLists');
+            const lists = stored.filterLists || {};
+            delete lists[name];
+            await chrome.storage.local.set({ filterLists: lists });
+            await clearAllDNRRules();
+            await loadAndCompileFilters();
+            return { ok: true };
+        }
+
+        case 'GET_FILTER_LISTS': {
+            const stored = await chrome.storage.local.get(['filterLists', 'customRules']);
+            const lists = stored.filterLists || {};
+            return {
+                lists: Object.keys(lists).map(n => ({
+                    name: n,
+                    lines: lists[n].split('\n').length,
+                })),
+                customRules: stored.customRules || '',
+            };
+        }
+
+        case 'SAVE_CUSTOM_RULES': {
+            await chrome.storage.local.set({ customRules: payload.rules });
+            await clearAllDNRRules();
+            await loadAndCompileFilters();
+            return { ok: true };
+        }
+
+        case 'RELOAD_FILTERS':
+            await clearAllDNRRules();
+            await loadAndCompileFilters();
+            return { ok: true, stats: state.engine ? state.engine.getStats() : {} };
+
+        case 'GET_COSMETIC_SELECTORS': {
+            const selectors = state.engine
+                ? state.engine.getCosmeticSelectors(payload.host)
+                : [];
+            return { selectors };
+        }
+
+        default:
+            return { error: `Unknown action: ${action}` };
     }
-
-    case 'SET_SITE_ENABLED': {
-      const { host, enabled } = payload;
-      if (!state.siteSettings[host]) state.siteSettings[host] = {};
-      state.siteSettings[host].enabled = Boolean(enabled);
-      await saveSettings();
-      return { ok: true };
-    }
-
-    case 'SET_SITE_WHITELIST': {
-      const { host, whitelisted } = payload;
-      if (!state.siteSettings[host]) state.siteSettings[host] = {};
-      state.siteSettings[host].whitelisted = Boolean(whitelisted);
-      await saveSettings();
-      return { ok: true };
-    }
-
-    case 'SET_SITE_BLOCK_SCRIPTS': {
-      const { host, blockScripts } = payload;
-      if (!state.siteSettings[host]) state.siteSettings[host] = {};
-      state.siteSettings[host].blockScripts = Boolean(blockScripts);
-      await saveSettings();
-      return { ok: true };
-    }
-
-    case 'SET_SITE_STRICT': {
-      const { host, strictMode } = payload;
-      if (!state.siteSettings[host]) state.siteSettings[host] = {};
-      state.siteSettings[host].strictMode = Boolean(strictMode);
-      await saveSettings();
-      return { ok: true };
-    }
-
-    // ── Logs
-    case 'GET_LOGS':
-      return {
-        logs:         state.blockedLog.slice().reverse(), // Most recent first
-        blockCount:   state.blockCount,
-        sessionCount: state.sessionCount,
-      };
-
-    case 'CLEAR_LOGS':
-      state.blockedLog   = [];
-      state.sessionCount = 0;
-      await saveSettings();
-      return { ok: true };
-
-    // ── Tab block count
-    case 'GET_TAB_COUNT': {
-      const tabId = payload.tabId;
-      return { count: tabBlockCounts.get(tabId) || 0 };
-    }
-
-    // ── Filter list management
-    case 'UPDATE_FILTER_LIST': {
-      const { name, url: listUrl } = payload;
-      try {
-        const content = await fetchFilterList(listUrl);
-        const stored  = await chrome.storage.local.get('filterLists');
-        const lists   = stored.filterLists || {};
-        lists[name]   = content;
-        await chrome.storage.local.set({ filterLists: lists });
-        await loadAndCompileFilters(); // Recompile
-        return { ok: true, lines: content.split('\n').length };
-      } catch (err) {
-        return { ok: false, error: err.message };
-      }
-    }
-
-    case 'REMOVE_FILTER_LIST': {
-      const { name } = payload;
-      const stored   = await chrome.storage.local.get('filterLists');
-      const lists    = stored.filterLists || {};
-      delete lists[name];
-      await chrome.storage.local.set({ filterLists: lists });
-      await loadAndCompileFilters();
-      return { ok: true };
-    }
-
-    case 'GET_FILTER_LISTS': {
-      const stored = await chrome.storage.local.get(['filterLists', 'customRules']);
-      const lists  = stored.filterLists || {};
-      return {
-        lists:       Object.keys(lists).map(n => ({ name: n, lines: lists[n].split('\n').length })),
-        customRules: stored.customRules || '',
-      };
-    }
-
-    case 'SAVE_CUSTOM_RULES': {
-      const { rules } = payload;
-      await chrome.storage.local.set({ customRules: rules });
-      await loadAndCompileFilters();
-      return { ok: true };
-    }
-
-    case 'RELOAD_FILTERS':
-      await loadAndCompileFilters();
-      return { ok: true, stats: state.engine ? state.engine.getStats() : {} };
-
-    // ── Default
-    default:
-      return { error: `Unknown action: ${action}` };
-  }
 }
 
 // ─────────────────────────────────────────────
@@ -612,73 +951,150 @@ async function handleMessage(message, sender) {
 // ─────────────────────────────────────────────
 
 function extractHostname(url) {
-  if (!url) return '';
-  try {
-    return new URL(url).hostname.toLowerCase().replace(/^www\./, '');
-  } catch {
-    return '';
-  }
-}
-
-function isSubdomain(host, parentHost) {
-  if (!host || !parentHost) return false;
-  return host === parentHost || host.endsWith('.' + parentHost);
+    if (!url) return '';
+    try {
+        return new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    } catch { return ''; }
 }
 
 function isSiteWhitelisted(host) {
-  if (!host) return false;
-  const cfg = state.siteSettings[host];
-  return cfg && cfg.whitelisted === true;
-}
-
-function getGenericUserAgent() {
-  // Return a common, non-identifying UA string
-  return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+    if (!host) return false;
+    const cfg = state.siteSettings[host];
+    return cfg && cfg.whitelisted === true;
 }
 
 async function fetchFilterList(url) {
-  // Only allow fetching from known HTTPS sources
-  if (!url.startsWith('https://')) {
-    throw new Error('Only HTTPS filter list URLs are allowed');
-  }
-
-  const response = await fetch(url, {
-    method:  'GET',
-    headers: { 'Cache-Control': 'no-cache' },
-  });
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  }
-
-  return response.text();
+    if (!url.startsWith('https://')) throw new Error('Only HTTPS URLs allowed');
+    const res = await fetch(url, { method: 'GET', headers: { 'Cache-Control': 'no-cache' } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.text();
 }
 
 // ─────────────────────────────────────────────
-// STARTUP
+// STARTUP – FIXED (No Double Init)
 // ─────────────────────────────────────────────
 
-// Run on service worker install
+// let _initDone = false;
+
+// async function safeInitialize() {
+//     if (_initDone) return;
+//     _initDone = true;
+//     await initialize();
+// }
+
+// // onInstalled – fresh install ya update
+// chrome.runtime.onInstalled.addListener(async (details) => {
+//     if (details.reason === 'install') {
+//         console.log('[PrivShield] First install – setting defaults.');
+//         await chrome.storage.local.set({
+//             enabled: true,
+//             strictMode: false,
+//             scriptBlock: false,
+//             spoofUserAgent: false,
+//             stripReferrer: true,
+//             blockFingerprint: true,
+//             searchRedirect: true,
+//             searchEngine: 'duckduckgo',
+//             customSearchURL: '',
+//             cleanTrackingURLs: true,
+//             blockNonPrivate: false,
+//             siteSettings: {},
+//             blockCount: 0,
+//             sessionCount: 0,
+//             redirectCount: 0,
+//             blockedLog: [],
+//             customRules: '',
+//             filterLists: {},
+//         });
+//     }
+//     _initDone = false; // Allow init after install/update
+//     await safeInitialize();
+// });
+
+// // onStartup – browser restart pe
+// chrome.runtime.onStartup.addListener(async () => {
+//     await safeInitialize();
+// });
+
+// // Service worker fresh start pe (first load)
+// (async () => {
+//     try {
+//         const stored = await chrome.storage.local.get('enabled');
+//         if (typeof stored.enabled === 'boolean') {
+//             // Already installed – initialize
+//             await safeInitialize();
+//         }
+//         // Agar nahi hai to onInstalled handle karega
+//     } catch { }
+// })();
+// ─────────────────────────────────────────────
+// STARTUP – Single Init Only
+// ─────────────────────────────────────────────
+
+let _initDone = false;
+
+async function safeInitialize() {
+  if (_initDone) {
+    console.log('[PrivShield] Already initialized, skipping.');
+    return;
+  }
+  _initDone = true;
+  await initialize();
+}
+
+// onInstalled
 chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === 'install') {
-    console.log('[PrivShield] First install. Setting defaults.');
+    console.log('[PrivShield] First install – setting defaults.');
     await chrome.storage.local.set({
-      enabled:          true,
-      strictMode:       false,
-      scriptBlock:      false,
-      spoofUserAgent:   false,
-      stripReferrer:    true,
-      blockFingerprint: true,
-      siteSettings:     {},
-      blockCount:       0,
-      blockedLog:       [],
-      customRules:      '',
-      filterLists:      {},
+      enabled:           true,
+      strictMode:        false,  // OFF by default
+      scriptBlock:       false,  // OFF by default
+      spoofUserAgent:    false,
+      stripReferrer:     true,
+      blockFingerprint:  true,
+      searchRedirect:    true,
+      searchEngine:      'duckduckgo',
+      customSearchURL:   '',
+      cleanTrackingURLs: true,
+      blockNonPrivate:   false,
+      siteSettings:      {},
+      blockCount:        0,
+      sessionCount:      0,
+      redirectCount:     0,
+      blockedLog:        [],
+      customRules:       '',
+      filterLists:       {},
     });
   }
 
-  await initialize();
+  if (details.reason === 'update') {
+    // Update pe strict/script block off karo
+    // (performance ke liye)
+    const stored = await chrome.storage.local.get([
+      'strictMode', 'scriptBlock'
+    ]);
+    console.log('[PrivShield] Extension updated.');
+  }
+
+  _initDone = false;
+  await safeInitialize();
 });
 
-// Run on service worker restart (browser restart, etc.)
-initialize();
+// Browser restart
+chrome.runtime.onStartup.addListener(async () => {
+  console.log('[PrivShield] Browser startup.');
+  await safeInitialize();
+});
+
+// Service worker first load
+(async () => {
+  try {
+    const stored = await chrome.storage.local.get('enabled');
+    if (typeof stored.enabled === 'boolean') {
+      await safeInitialize();
+    }
+  } catch (err) {
+    console.error('[PrivShield] Startup error:', err);
+  }
+})();

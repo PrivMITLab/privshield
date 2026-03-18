@@ -1,345 +1,392 @@
 /**
- * PrivShield – Popup Controller
+ * PrivShield – Popup Controller v2.0.0
  * PrivMITLab
  *
- * Handles all popup UI interactions.
- * Communicates with background.js via chrome.runtime.sendMessage.
+ * Fixed:
+ *  - Auto-refresh for live block count
+ *  - Redirect count display
+ *  - Engine switcher highlight
+ *  - Smooth UI updates
  */
-
 'use strict';
 
 // ─────────────────────────────────────────────
-// DOM Elements
+// DOM ELEMENTS
 // ─────────────────────────────────────────────
 
 const el = {
-  // Header / status
-  currentHostname:  document.getElementById('currentHostname'),
-  siteStatus:       document.getElementById('siteStatus'),
-  siteStatusIcon:   document.getElementById('siteStatusIcon'),
-  tabBlockCount:    document.getElementById('tabBlockCount'),
-
-  // Stats
-  statTotal:        document.getElementById('statTotal'),
-  statSession:      document.getElementById('statSession'),
-  statRules:        document.getElementById('statRules'),
-
-  // Global toggles
-  toggleGlobal:     document.getElementById('toggleGlobal'),
-  toggleFingerprint:document.getElementById('toggleFingerprint'),
-  toggleReferrer:   document.getElementById('toggleReferrer'),
-  toggleUA:         document.getElementById('toggleUA'),
-  toggleStrict:     document.getElementById('toggleStrict'),
-  toggleScripts:    document.getElementById('toggleScripts'),
-
-  // Site toggles
-  toggleSite:        document.getElementById('toggleSite'),
-  toggleSiteScripts: document.getElementById('toggleSiteScripts'),
-  toggleSiteStrict:  document.getElementById('toggleSiteStrict'),
-
-  // Buttons
-  btnWhitelist:   document.getElementById('btnWhitelist'),
-  whitelistText:  document.getElementById('whitelistBtnText'),
-  btnDashboard:   document.getElementById('btnDashboard'),
-  btnReload:      document.getElementById('btnReload'),
-
-  // Toast
-  toast: document.getElementById('psToast'),
+    currentHostname: document.getElementById('currentHostname'),
+    siteStatus: document.getElementById('siteStatus'),
+    siteStatusIcon: document.getElementById('siteStatusIcon'),
+    tabBlockCount: document.getElementById('tabBlockCount'),
+    statTotal: document.getElementById('statTotal'),
+    statRedirect: document.getElementById('statRedirect'),
+    statRules: document.getElementById('statRules'),
+    toggleGlobal: document.getElementById('toggleGlobal'),
+    toggleFingerprint: document.getElementById('toggleFingerprint'),
+    toggleReferrer: document.getElementById('toggleReferrer'),
+    toggleUA: document.getElementById('toggleUA'),
+    toggleStrict: document.getElementById('toggleStrict'),
+    toggleScripts: document.getElementById('toggleScripts'),
+    toggleSite: document.getElementById('toggleSite'),
+    toggleSiteScripts: document.getElementById('toggleSiteScripts'),
+    toggleSiteStrict: document.getElementById('toggleSiteStrict'),
+    toggleSearchRedirect: document.getElementById('toggleSearchRedirect'),
+    toggleCleanURLs: document.getElementById('toggleCleanURLs'),
+    btnWhitelist: document.getElementById('btnWhitelist'),
+    whitelistText: document.getElementById('whitelistBtnText'),
+    btnDashboard: document.getElementById('btnDashboard'),
+    btnReload: document.getElementById('btnReload'),
+    toast: document.getElementById('psToast'),
+    engineBtns: document.querySelectorAll('.ps-engine-btn'),
 };
 
 // ─────────────────────────────────────────────
-// State
+// STATE
 // ─────────────────────────────────────────────
 
-let currentTab      = null;
+let currentTab = null;
 let currentHostname = '';
-let globalState     = {};
-let siteSettings    = {};
-let isWhitelisted   = false;
+let globalState = {};
+let siteSettings = {};
+let isWhitelisted = false;
+let refreshInterval = null;
 
 // ─────────────────────────────────────────────
-// Initialize
+// INIT
 // ─────────────────────────────────────────────
 
 async function init() {
-  try {
-    // Get current tab info
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    currentTab  = tab;
+    try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        currentTab = tab;
 
-    if (tab && tab.url) {
-      try {
-        currentHostname = new URL(tab.url).hostname.toLowerCase().replace(/^www\./, '');
-      } catch {
-        currentHostname = '';
-      }
+        if (tab?.url) {
+            try {
+                currentHostname = new URL(tab.url).hostname.toLowerCase().replace(/^www\./, '');
+            } catch {
+                currentHostname = '';
+            }
+        }
+
+        el.currentHostname.textContent = currentHostname || 'No page';
+
+        await refreshState();
+        bindEvents();
+        startAutoRefresh();
+
+    } catch (err) {
+        console.error('[PrivShield Popup] Init error:', err);
     }
-
-    el.currentHostname.textContent = currentHostname || 'No page';
-
-    // Load state from background
-    await refreshState();
-
-    // Register listeners
-    bindEvents();
-
-  } catch (err) {
-    console.error('[PrivShield Popup] Init error:', err);
-    showToast('Extension loading...', 2000);
-  }
 }
+
+// ─────────────────────────────────────────────
+// REFRESH STATE (Full)
+// ─────────────────────────────────────────────
 
 async function refreshState() {
-  try {
-    // Get global state
-    globalState = await sendMessage({ action: 'GET_STATE' });
+    try {
+        globalState = await sendMessage('GET_STATE');
 
-    // Get site-specific settings
-    if (currentHostname) {
-      const siteResp = await sendMessage({
-        action:  'GET_SITE_SETTINGS',
-        payload: { host: currentHostname },
-      });
-      siteSettings  = siteResp.settings || {};
-      isWhitelisted = siteResp.isWhitelisted || false;
+        if (currentHostname) {
+            const r = await sendMessage('GET_SITE_SETTINGS', { host: currentHostname });
+            siteSettings = r.settings || {};
+            isWhitelisted = r.isWhitelisted || false;
+        }
+
+        let tabCount = 0, tabRedirects = 0;
+        if (currentTab) {
+            const r = await sendMessage('GET_TAB_COUNT', { tabId: currentTab.id });
+            tabCount = r.count || 0;
+            tabRedirects = r.redirects || 0;
+        }
+
+        renderUI(globalState, siteSettings, tabCount, tabRedirects);
+
+    } catch (err) {
+        console.error('[PrivShield Popup] Refresh error:', err);
     }
+}
 
-    // Get tab block count
-    let tabCount = 0;
-    if (currentTab) {
-      const countResp = await sendMessage({
-        action:  'GET_TAB_COUNT',
-        payload: { tabId: currentTab.id },
-      });
-      tabCount = countResp.count || 0;
+// ─────────────────────────────────────────────
+// AUTO REFRESH – Live Count (every 3 sec)
+// ─────────────────────────────────────────────
+
+function startAutoRefresh() {
+    if (refreshInterval) return;
+
+    refreshInterval = setInterval(async () => {
+        try {
+            let tabCount = 0, tabRedirects = 0;
+
+            if (currentTab) {
+                const r = await sendMessage('GET_TAB_COUNT', { tabId: currentTab.id });
+                tabCount = r.count || 0;
+                tabRedirects = r.redirects || 0;
+            }
+
+            const gState = await sendMessage('GET_STATE');
+
+            // Update numbers only (no full re-render = smooth)
+            const total = tabCount + tabRedirects;
+            el.tabBlockCount.textContent = formatCount(total);
+            el.statTotal.textContent = formatCount(gState.blockCount || 0);
+            el.statRedirect.textContent = formatCount(gState.redirectCount || 0);
+            el.statRules.textContent = formatCount(gState.engineStats?.totalRules || 0);
+
+            // Animate badge number if changed
+            if (total > 0) {
+                el.tabBlockCount.style.color = tabRedirects > 0 ? '#3fb950' : '#f85149';
+            }
+
+        } catch {
+            // Popup may be closing – silent fail
+        }
+    }, 3000);
+}
+
+// Clear interval when popup closes
+window.addEventListener('unload', () => {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+        refreshInterval = null;
     }
+});
 
-    // Update UI
-    renderUI(globalState, siteSettings, tabCount);
+// ─────────────────────────────────────────────
+// RENDER UI
+// ─────────────────────────────────────────────
 
-  } catch (err) {
-    console.error('[PrivShield Popup] State load error:', err);
-  }
+function renderUI(g, s, tabCount, tabRedirects) {
+
+    // ── Global toggles
+    el.toggleGlobal.checked = g.enabled !== false;
+    el.toggleFingerprint.checked = g.blockFingerprint !== false;
+    el.toggleReferrer.checked = g.stripReferrer !== false;
+    el.toggleUA.checked = g.spoofUserAgent === true;
+    el.toggleStrict.checked = g.strictMode === true;
+    el.toggleScripts.checked = g.scriptBlock === true;
+    el.toggleSearchRedirect.checked = g.searchRedirect !== false;
+    el.toggleCleanURLs.checked = g.cleanTrackingURLs !== false;
+
+    // ── Site toggles
+    el.toggleSite.checked = s.enabled !== false;
+    el.toggleSiteScripts.checked = s.blockScripts === true;
+    el.toggleSiteStrict.checked = s.strictMode === true;
+
+    // ── Whitelist button
+    el.btnWhitelist.classList.toggle('is-whitelisted', isWhitelisted);
+    el.whitelistText.textContent = isWhitelisted
+        ? '✕ Remove from Allowlist'
+        : '☑ Add to Allowlist';
+
+    // ── Stats
+    el.statTotal.textContent = formatCount(g.blockCount || 0);
+    el.statRedirect.textContent = formatCount(g.redirectCount || 0);
+    el.statRules.textContent = formatCount(g.engineStats?.totalRules || 0);
+
+    // ── Tab badge count (blocked + redirected)
+    const total = tabCount + tabRedirects;
+    el.tabBlockCount.textContent = formatCount(total);
+    el.tabBlockCount.style.color = tabRedirects > 0 ? '#3fb950' : '#f85149';
+
+    // ── Engine buttons – highlight active
+    const activeEngine = g.searchEngine || 'duckduckgo';
+    el.engineBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.engine === activeEngine);
+    });
+
+    // ── Site status
+    updateSiteStatus(g, s);
+
+    // ── Disabled overlay
+    document.body.classList.toggle('ps-disabled', g.enabled === false);
+}
+
+function updateSiteStatus(g, s) {
+    if (g.enabled === false) {
+        el.siteStatusIcon.textContent = '🔴';
+        el.siteStatus.textContent = 'PrivShield Disabled';
+        el.siteStatus.className = 'ps-site-status unprotected';
+        return;
+    }
+    if (isWhitelisted) {
+        el.siteStatusIcon.textContent = '🟡';
+        el.siteStatus.textContent = 'Allowlisted';
+        el.siteStatus.className = 'ps-site-status whitelisted';
+        return;
+    }
+    if (s.enabled === false) {
+        el.siteStatusIcon.textContent = '🟠';
+        el.siteStatus.textContent = 'Site Paused';
+        el.siteStatus.className = 'ps-site-status whitelisted';
+        return;
+    }
+    el.siteStatusIcon.textContent = '🟢';
+    el.siteStatus.textContent = 'Protected';
+    el.siteStatus.className = 'ps-site-status';
 }
 
 // ─────────────────────────────────────────────
-// Render
-// ─────────────────────────────────────────────
-
-function renderUI(gState, sState, tabCount) {
-  // ── Global toggle
-  el.toggleGlobal.checked     = gState.enabled !== false;
-  el.toggleFingerprint.checked = gState.blockFingerprint !== false;
-  el.toggleReferrer.checked   = gState.stripReferrer !== false;
-  el.toggleUA.checked         = gState.spoofUserAgent === true;
-  el.toggleStrict.checked     = gState.strictMode === true;
-  el.toggleScripts.checked    = gState.scriptBlock === true;
-
-  // ── Site toggles
-  el.toggleSite.checked        = sState.enabled !== false;
-  el.toggleSiteScripts.checked = sState.blockScripts === true;
-  el.toggleSiteStrict.checked  = sState.strictMode === true;
-
-  // ── Whitelist button
-  if (isWhitelisted) {
-    el.btnWhitelist.classList.add('is-whitelisted');
-    el.whitelistText.textContent = '✕ Remove from Allowlist';
-  } else {
-    el.btnWhitelist.classList.remove('is-whitelisted');
-    el.whitelistText.textContent = '☑ Add to Allowlist';
-  }
-
-  // ── Stats
-  el.statTotal.textContent   = formatCount(gState.blockCount || 0);
-  el.statSession.textContent = formatCount(gState.sessionCount || 0);
-  el.statRules.textContent   = formatCount(gState.engineStats?.totalRules || 0);
-
-  // ── Tab block count
-  el.tabBlockCount.textContent = formatCount(tabCount);
-
-  // ── Site status display
-  updateSiteStatusDisplay(gState, sState);
-
-  // ── Disabled state
-  if (!gState.enabled) {
-    document.body.classList.add('ps-disabled');
-  } else {
-    document.body.classList.remove('ps-disabled');
-  }
-}
-
-function updateSiteStatusDisplay(gState, sState) {
-  if (!gState.enabled) {
-    el.siteStatusIcon.textContent  = '🔴';
-    el.siteStatus.textContent      = 'PrivShield Disabled';
-    el.siteStatus.className        = 'ps-site-status unprotected';
-    return;
-  }
-
-  if (isWhitelisted) {
-    el.siteStatusIcon.textContent  = '🟡';
-    el.siteStatus.textContent      = 'Allowlisted';
-    el.siteStatus.className        = 'ps-site-status whitelisted';
-    return;
-  }
-
-  if (sState.enabled === false) {
-    el.siteStatusIcon.textContent  = '🟠';
-    el.siteStatus.textContent      = 'Site Paused';
-    el.siteStatus.className        = 'ps-site-status whitelisted';
-    return;
-  }
-
-  el.siteStatusIcon.textContent    = '🟢';
-  el.siteStatus.textContent        = 'Protected';
-  el.siteStatus.className          = 'ps-site-status';
-}
-
-// ─────────────────────────────────────────────
-// Event Bindings
+// BIND EVENTS
 // ─────────────────────────────────────────────
 
 function bindEvents() {
 
-  // ── Global toggle
-  el.toggleGlobal.addEventListener('change', async () => {
-    const enabled = el.toggleGlobal.checked;
-    await sendMessage({ action: 'SET_ENABLED', payload: { enabled } });
-    showToast(enabled ? '✅ PrivShield ON' : '⛔ PrivShield OFF');
-    await refreshState();
-  });
-
-  // ── Global options
-  el.toggleFingerprint.addEventListener('change', async () => {
-    await sendMessage({
-      action:  'SET_FINGERPRINT_BLOCK',
-      payload: { blockFingerprint: el.toggleFingerprint.checked },
+    // ── Global toggle
+    el.toggleGlobal.addEventListener('change', async () => {
+        await sendMessage('SET_ENABLED', { enabled: el.toggleGlobal.checked });
+        showToast(el.toggleGlobal.checked ? '✅ PrivShield ON' : '⛔ PrivShield OFF');
+        await refreshState();
     });
-    showToast('Fingerprint protection updated');
-  });
 
-  el.toggleReferrer.addEventListener('change', async () => {
-    await sendMessage({
-      action:  'SET_STRIP_REFERRER',
-      payload: { stripReferrer: el.toggleReferrer.checked },
+    // ── Global options
+    el.toggleFingerprint.addEventListener('change', async () => {
+        await sendMessage('SET_FINGERPRINT_BLOCK', { blockFingerprint: el.toggleFingerprint.checked });
+        showToast('🧬 Fingerprint protection ' + (el.toggleFingerprint.checked ? 'ON' : 'OFF'));
     });
-    showToast('Referrer stripping updated');
-  });
 
-  el.toggleUA.addEventListener('change', async () => {
-    await sendMessage({
-      action:  'SET_SPOOF_UA',
-      payload: { spoofUserAgent: el.toggleUA.checked },
+    el.toggleReferrer.addEventListener('change', async () => {
+        await sendMessage('SET_STRIP_REFERRER', { stripReferrer: el.toggleReferrer.checked });
+        showToast('🔗 Referrer stripping ' + (el.toggleReferrer.checked ? 'ON' : 'OFF'));
     });
-    showToast('User-Agent spoofing updated');
-  });
 
-  el.toggleStrict.addEventListener('change', async () => {
-    await sendMessage({
-      action:  'SET_STRICT_MODE',
-      payload: { strictMode: el.toggleStrict.checked },
+    el.toggleUA.addEventListener('change', async () => {
+        await sendMessage('SET_SPOOF_UA', { spoofUserAgent: el.toggleUA.checked });
+        showToast('🕵 User-Agent spoofing ' + (el.toggleUA.checked ? 'ON' : 'OFF'));
     });
-    showToast(el.toggleStrict.checked ? '🔒 Strict Mode ON' : 'Strict Mode OFF');
-  });
 
-  el.toggleScripts.addEventListener('change', async () => {
-    await sendMessage({
-      action:  'SET_SCRIPT_BLOCK',
-      payload: { scriptBlock: el.toggleScripts.checked },
+    el.toggleStrict.addEventListener('change', async () => {
+        await sendMessage('SET_STRICT_MODE', { strictMode: el.toggleStrict.checked });
+        showToast(el.toggleStrict.checked ? '🔒 Strict Mode ON' : 'Strict Mode OFF');
     });
-    showToast(el.toggleScripts.checked ? '📜 Scripts blocked globally' : 'Scripts allowed');
-  });
 
-  // ── Per-site controls
-  el.toggleSite.addEventListener('change', async () => {
-    if (!currentHostname) return;
-    await sendMessage({
-      action:  'SET_SITE_ENABLED',
-      payload: { host: currentHostname, enabled: el.toggleSite.checked },
+    el.toggleScripts.addEventListener('change', async () => {
+        await sendMessage('SET_SCRIPT_BLOCK', { scriptBlock: el.toggleScripts.checked });
+        showToast(el.toggleScripts.checked ? '📜 All Scripts Blocked' : 'Scripts Allowed');
     });
-    await refreshState();
-    showToast(`Site protection ${el.toggleSite.checked ? 'enabled' : 'disabled'}`);
-  });
 
-  el.toggleSiteScripts.addEventListener('change', async () => {
-    if (!currentHostname) return;
-    await sendMessage({
-      action:  'SET_SITE_BLOCK_SCRIPTS',
-      payload: { host: currentHostname, blockScripts: el.toggleSiteScripts.checked },
+    // ── Search toggles
+    el.toggleSearchRedirect.addEventListener('change', async () => {
+        await sendMessage('SET_SEARCH_REDIRECT', { searchRedirect: el.toggleSearchRedirect.checked });
+        showToast(el.toggleSearchRedirect.checked ? '🔍 Search Redirect ON' : 'Search Redirect OFF');
     });
-    showToast(el.toggleSiteScripts.checked ? 'Scripts blocked on site' : 'Scripts allowed on site');
-  });
 
-  el.toggleSiteStrict.addEventListener('change', async () => {
-    if (!currentHostname) return;
-    await sendMessage({
-      action:  'SET_SITE_STRICT',
-      payload: { host: currentHostname, strictMode: el.toggleSiteStrict.checked },
+    el.toggleCleanURLs.addEventListener('change', async () => {
+        await sendMessage('SET_CLEAN_TRACKING', { cleanTrackingURLs: el.toggleCleanURLs.checked });
+        showToast(el.toggleCleanURLs.checked ? '🧹 URL Cleaning ON' : 'URL Cleaning OFF');
     });
-    showToast(`Site strict mode ${el.toggleSiteStrict.checked ? 'ON' : 'OFF'}`);
-  });
 
-  // ── Whitelist button
-  el.btnWhitelist.addEventListener('click', async () => {
-    if (!currentHostname) return;
-    const newState = !isWhitelisted;
-    await sendMessage({
-      action:  'SET_SITE_WHITELIST',
-      payload: { host: currentHostname, whitelisted: newState },
+    // ── Engine buttons
+    el.engineBtns.forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const engine = btn.dataset.engine;
+            await sendMessage('SET_SEARCH_ENGINE', { searchEngine: engine });
+
+            // Update active state immediately
+            el.engineBtns.forEach(b => b.classList.toggle('active', b.dataset.engine === engine));
+
+            const names = {
+                duckduckgo: 'DuckDuckGo',
+                brave: 'Brave Search',
+                startpage: 'Startpage',
+            };
+            showToast(`✅ Engine: ${names[engine] || engine}`);
+        });
     });
-    showToast(newState ? `✅ ${currentHostname} allowlisted` : `🔒 ${currentHostname} removed from allowlist`);
-    await refreshState();
-  });
 
-  // ── Dashboard button
-  el.btnDashboard.addEventListener('click', () => {
-    chrome.runtime.openOptionsPage();
-    window.close();
-  });
+    // ── Per-site controls
+    el.toggleSite.addEventListener('change', async () => {
+        if (!currentHostname) return;
+        await sendMessage('SET_SITE_ENABLED', {
+            host: currentHostname,
+            enabled: el.toggleSite.checked,
+        });
+        await refreshState();
+        showToast(`Site protection ${el.toggleSite.checked ? 'enabled' : 'disabled'}`);
+    });
 
-  // ── Reload button
-  el.btnReload.addEventListener('click', async () => {
-    if (currentTab) {
-      await chrome.tabs.reload(currentTab.id);
-      window.close();
-    }
-  });
+    el.toggleSiteScripts.addEventListener('change', async () => {
+        if (!currentHostname) return;
+        await sendMessage('SET_SITE_BLOCK_SCRIPTS', {
+            host: currentHostname,
+            blockScripts: el.toggleSiteScripts.checked,
+        });
+        showToast(el.toggleSiteScripts.checked
+            ? '📜 Scripts blocked on site'
+            : 'Scripts allowed on site');
+    });
+
+    el.toggleSiteStrict.addEventListener('change', async () => {
+        if (!currentHostname) return;
+        await sendMessage('SET_SITE_STRICT', {
+            host: currentHostname,
+            strictMode: el.toggleSiteStrict.checked,
+        });
+        showToast(`Site strict mode ${el.toggleSiteStrict.checked ? 'ON' : 'OFF'}`);
+    });
+
+    // ── Whitelist button
+    el.btnWhitelist.addEventListener('click', async () => {
+        if (!currentHostname) return;
+        const newState = !isWhitelisted;
+        await sendMessage('SET_SITE_WHITELIST', {
+            host: currentHostname,
+            whitelisted: newState,
+        });
+        showToast(newState
+            ? `✅ ${currentHostname} allowlisted`
+            : `🔒 ${currentHostname} removed from allowlist`);
+        await refreshState();
+    });
+
+    // ── Footer buttons
+    el.btnDashboard.addEventListener('click', () => {
+        chrome.runtime.openOptionsPage();
+        window.close();
+    });
+
+    el.btnReload.addEventListener('click', async () => {
+        if (currentTab) {
+            await chrome.tabs.reload(currentTab.id);
+            window.close();
+        }
+    });
 }
 
 // ─────────────────────────────────────────────
-// Utilities
+// UTILITIES
 // ─────────────────────────────────────────────
 
-function sendMessage(message) {
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage(message, (response) => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-      } else {
-        resolve(response || {});
-      }
+function sendMessage(action, payload = {}) {
+    return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({ action, payload }, res => {
+            if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+            } else {
+                resolve(res || {});
+            }
+        });
     });
-  });
 }
 
 function formatCount(n) {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
-  if (n >= 1_000)     return (n / 1_000).toFixed(1) + 'K';
-  return String(n);
+    n = Number(n) || 0;
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+    if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
+    return String(n);
 }
 
 let toastTimer = null;
-function showToast(message, duration = 1800) {
-  el.toast.textContent = message;
-  el.toast.classList.add('show');
-  if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => {
-    el.toast.classList.remove('show');
-  }, duration);
+function showToast(msg, duration = 1800) {
+    el.toast.textContent = msg;
+    el.toast.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.toast.classList.remove('show'), duration);
 }
 
 // ─────────────────────────────────────────────
-// Boot
+// BOOT
 // ─────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', init);

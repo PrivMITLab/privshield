@@ -8,9 +8,7 @@
 </head>
 <body>
 
-  <!-- ═══════════════════════════════════════ -->
-  <!-- HEADER                                  -->
-  <!-- ═══════════════════════════════════════ -->
+  <!-- HEADER -->
   <header class="ps-header">
     <div class="ps-logo">
       <span class="ps-logo-icon">🛡</span>
@@ -19,12 +17,10 @@
         <span class="ps-tagline">by PrivMITLab</span>
       </div>
     </div>
-    <div class="ps-version">v1.0.0</div>
+    <span class="ps-version">v2.0.0</span>
   </header>
 
-  <!-- ═══════════════════════════════════════ -->
-  <!-- SITE STATUS BAR                         -->
-  <!-- ═══════════════════════════════════════ -->
+  <!-- SITE STATUS -->
   <div class="ps-site-bar">
     <div class="ps-site-info">
       <span class="ps-site-icon" id="siteStatusIcon">🟢</span>
@@ -39,14 +35,12 @@
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════ -->
-  <!-- GLOBAL MASTER TOGGLE                    -->
-  <!-- ═══════════════════════════════════════ -->
+  <!-- MASTER TOGGLE -->
   <div class="ps-master-toggle-wrap">
     <div class="ps-toggle-group ps-master">
       <div class="ps-toggle-info">
-        <span class="ps-toggle-name">PrivShield</span>
-        <span class="ps-toggle-desc">Global protection</span>
+        <span class="ps-toggle-name">PrivShield Protection</span>
+        <span class="ps-toggle-desc">Global on/off switch</span>
       </div>
       <label class="ps-toggle-switch">
         <input type="checkbox" id="toggleGlobal" />
@@ -55,27 +49,66 @@
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════ -->
-  <!-- QUICK STATS                             -->
-  <!-- ═══════════════════════════════════════ -->
+  <!-- QUICK STATS -->
   <div class="ps-stats-row">
     <div class="ps-stat-card">
       <span class="ps-stat-num" id="statTotal">0</span>
-      <span class="ps-stat-label">Total Blocked</span>
+      <span class="ps-stat-label">Blocked</span>
     </div>
     <div class="ps-stat-card">
-      <span class="ps-stat-num" id="statSession">0</span>
-      <span class="ps-stat-label">This Session</span>
+      <span class="ps-stat-num stat-green" id="statRedirect">0</span>
+      <span class="ps-stat-label">Redirected</span>
     </div>
     <div class="ps-stat-card">
-      <span class="ps-stat-num" id="statRules">0</span>
-      <span class="ps-stat-label">Filter Rules</span>
+      <span class="ps-stat-num stat-blue" id="statRules">0</span>
+      <span class="ps-stat-label">Rules</span>
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════ -->
-  <!-- PER-SITE CONTROLS                       -->
-  <!-- ═══════════════════════════════════════ -->
+  <!-- SEARCH ENGINE STATUS -->
+  <div class="ps-section">
+    <div class="ps-section-title">🔍 Search Privacy</div>
+
+    <div class="ps-toggle-group">
+      <div class="ps-toggle-info">
+        <span class="ps-toggle-name">🔒 Private Search</span>
+        <span class="ps-toggle-desc">Redirect to privacy engine</span>
+      </div>
+      <label class="ps-toggle-switch">
+        <input type="checkbox" id="toggleSearchRedirect" />
+        <span class="ps-slider"></span>
+      </label>
+    </div>
+
+    <!-- Quick Engine Switcher -->
+    <div class="ps-engine-row" id="engineRow">
+      <span class="ps-engine-label">Engine:</span>
+      <div class="ps-engine-btns">
+        <button class="ps-engine-btn" data-engine="duckduckgo" id="btnDDG">
+          🦆 DuckDuckGo
+        </button>
+        <button class="ps-engine-btn" data-engine="brave" id="btnBrave">
+          🦁 Brave
+        </button>
+        <button class="ps-engine-btn" data-engine="startpage" id="btnStartpage">
+          🔒 Startpage
+        </button>
+      </div>
+    </div>
+
+    <div class="ps-toggle-group">
+      <div class="ps-toggle-info">
+        <span class="ps-toggle-name">🧹 Clean Tracking URLs</span>
+        <span class="ps-toggle-desc">Remove utm_*, fbclid, gclid...</span>
+      </div>
+      <label class="ps-toggle-switch">
+        <input type="checkbox" id="toggleCleanURLs" />
+        <span class="ps-slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- THIS SITE -->
   <div class="ps-section">
     <div class="ps-section-title">This Site</div>
 
@@ -117,9 +150,7 @@
     </button>
   </div>
 
-  <!-- ═══════════════════════════════════════ -->
-  <!-- GLOBAL OPTIONS                          -->
-  <!-- ═══════════════════════════════════════ -->
+  <!-- GLOBAL OPTIONS -->
   <div class="ps-section">
     <div class="ps-section-title">Global Options</div>
 
@@ -170,7 +201,7 @@
     <div class="ps-toggle-group">
       <div class="ps-toggle-info">
         <span class="ps-toggle-name">📜 Block All Scripts</span>
-        <span class="ps-toggle-desc">Global JavaScript block</span>
+        <span class="ps-toggle-desc">Global JavaScript blocker</span>
       </div>
       <label class="ps-toggle-switch">
         <input type="checkbox" id="toggleScripts" />
@@ -179,21 +210,13 @@
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════ -->
-  <!-- FOOTER ACTIONS                          -->
-  <!-- ═══════════════════════════════════════ -->
+  <!-- FOOTER -->
   <div class="ps-footer">
-    <button class="ps-btn ps-btn-secondary" id="btnDashboard">
-      ⚙ Dashboard
-    </button>
-    <button class="ps-btn ps-btn-secondary" id="btnReload">
-      🔄 Reload Page
-    </button>
+    <button class="ps-btn ps-btn-secondary" id="btnDashboard">⚙ Dashboard</button>
+    <button class="ps-btn ps-btn-secondary" id="btnReload">🔄 Reload Page</button>
   </div>
 
-  <!-- Status toast -->
   <div class="ps-toast" id="psToast"></div>
-
   <script src="popup.js"></script>
 </body>
 </html>
